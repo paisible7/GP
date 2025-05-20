@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:ping/screens/login_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Supabase.initialize(
+    url: 'https://your-project-ref.supabase.co',
+    anonKey: 'your-an
+  );
   runApp(const MyApp());
 }
 
