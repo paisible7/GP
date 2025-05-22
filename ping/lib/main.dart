@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:ping/core/supabase_init.dart';
 import 'package:ping/screens/login_screen.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:ping/screens/signup_screen.dart';
+import 'package:ping/screens/reset_password_screen.dart';
+import 'package:ping/screens/new_password_screen.dart';
+import 'package:ping/screens/home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Supabase.initialize(
-    url: "https://xvkenqfcdmhlvfxkzqwe.supabase.co",
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh2a2VucWZjZG1obHZmeGt6cXdlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc3NDU0MjQsImV4cCI6MjA2MzMyMTQyNH0.d9tEQGgq8a3cDuUqlHJfHw0EGyu6klKg6QArjmxqqdg',
-  );
+  await SupabaseConfig.initialize();
   runApp(const MyApp());
 }
 
@@ -17,30 +18,16 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: LoginScreen(),
-    );
-  }
-}
-
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
-
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Ping', style: TextStyle(color: Colors.white),),
-        backgroundColor: Colors.blue,
-      ),
-      body: Center(
-        child: Text('Bienvenu sur Ping\nune application pour marquer la presence dans les !'),
-      ),
-    );
+        debugShowCheckedModeBanner: false,
+        title: "Ping",
+        initialRoute: '/login',
+        routes: {
+          '/login': (context) => LoginScreen(),
+          '/signup': (context) => SignupScreen(),
+          '/reset-password': (context) => ResetPasswordScreen(),
+          '/new-password': (context) => NewPasswordScreen(),
+          '/home': (context) => HomeScreen(),
+        },
+        );
   }
 }
