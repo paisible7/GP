@@ -110,7 +110,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: TextStyle(fontSize: 14, fontFamily: 'poppins'),
                     decoration: InputDecoration(
                       labelText: "Email",
-                      hintText: "votreadresse@esisalama.org",
+                      hintText: "matricule@esisalama.org",
                       border: InputBorder.none,
                       floatingLabelBehavior: FloatingLabelBehavior.always,
                       hintStyle: TextStyle(
