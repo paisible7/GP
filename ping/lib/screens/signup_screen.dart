@@ -128,7 +128,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColor.secondaryExtraSoft),
+                    border: Border.all(color: AppColor.primarySoft),
                   ),
                   child: TextField(
                     controller: emailC,
@@ -155,7 +155,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   margin: EdgeInsets.only(bottom: 24),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColor.secondaryExtraSoft),
+                    border: Border.all(color: AppColor.secondarySoft),
                   ),
                   child: TextField(
                     controller: passC,

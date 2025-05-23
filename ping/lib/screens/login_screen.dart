@@ -33,7 +33,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       if (response.user != null) {
         // 👇 Ici tu peux rediriger vers le dashboard par exemple
-        Navigator.pushReplacementNamed(context, '/home');
+        Navigator.pushReplacementNamed(context, '/profile');
       }
     } on AuthException catch (error) {
       print("Erreur d'authentification ");
@@ -114,7 +114,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColor.secondaryExtraSoft),
+                      border: Border.all(color: AppColor.primarySoft),
                     ),
                     child: TextField(
                       controller: _emailC,
@@ -126,11 +126,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         floatingLabelBehavior: FloatingLabelBehavior.always,
                         hintStyle: TextStyle(
                           fontSize: 14,
-                          color: AppColor.secondarySoft,
+                          color: AppColor.primarySoft,
                           fontWeight: FontWeight.w500,
                         ),
                         labelStyle: TextStyle(
-                          color: AppColor.secondarySoft,
+                          color: AppColor.primarySoft,
                           fontSize: 14,
                         ),
                       ),
@@ -141,7 +141,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     margin: EdgeInsets.only(bottom: 24),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColor.secondaryExtraSoft),
+                      border: Border.all(color: AppColor.primarySoft),
                     ),
                     child: TextField(
                       controller: _passC,
@@ -153,14 +153,14 @@ class _LoginScreenState extends State<LoginScreen> {
                         border: InputBorder.none,
                         floatingLabelBehavior: FloatingLabelBehavior.always,
                         labelStyle: TextStyle(
-                          color: AppColor.secondarySoft,
+                          color: AppColor.primarySoft,
                           fontSize: 14,
                         ),
                         hintStyle: TextStyle(
                           fontSize: 14,
                           fontFamily: 'poppins',
                           fontWeight: FontWeight.w500,
-                          color: AppColor.secondarySoft,
+                          color: AppColor.primarySoft,
                         ),
                         suffixIcon: IconButton(
                           icon: Icon(
@@ -180,7 +180,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: handleLogin,
+                      onPressed: isLoading ? null : handleLogin,
                       style: ElevatedButton.styleFrom(
                         padding: EdgeInsets.symmetric(vertical: 18),
                         backgroundColor: AppColor.primary,
