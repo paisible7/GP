@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:ping/core/supabase_init.dart';
 import 'package:ping/screens/login_screen.dart';
 import 'package:ping/screens/profile_screen.dart';
+import 'package:ping/screens/scan_screen.dart';
 import 'package:ping/screens/signup_screen.dart';
 import 'package:ping/screens/reset_password_screen.dart';
 import 'package:ping/screens/new_password_screen.dart';
@@ -29,7 +30,7 @@ class MyApp extends StatelessWidget {
           '/new-password': (context) => NewPasswordScreen(),
           '/home': (context) => HomeScreen(),
           '/profile': (context) => ProfileScreen(),
-          //'/scan': (context) => const ScanScreen(),
+          '/scan': (context) => QRScannerScreen(),
           //'/presences': (context) => const PresencesScreen(),
         },
         );

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 import 'package:ping/theme/app_theme.dart';
 
 
@@ -37,26 +36,13 @@ class _SignupScreenState extends State<SignupScreen> {
 
       final user = response.user;
       if (user != null) {
-        Fluttertoast.showToast(
-          msg: "Inscription réussie. Veuillez vérifier votre email.",
-          backgroundColor: Colors.green,
-          textColor: Colors.white,
-        );
         print("SUCCESSSSSS");
         Navigator.pushReplacementNamed(context, '/home'); // Ou vers login si tu préfères
       }
     } on AuthException catch (error) {
-      Fluttertoast.showToast(
-        msg: error.message,
-        backgroundColor: Colors.red,
-        textColor: Colors.white,
-      );
+
     } catch (e) {
-      Fluttertoast.showToast(
-        msg: 'Erreur inconnue',
-        backgroundColor: Colors.red,
-        textColor: Colors.white,
-      );
+
       print("ECHEC");
     } finally {
       setState(() {
