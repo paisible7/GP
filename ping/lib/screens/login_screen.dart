@@ -67,14 +67,25 @@ class _LoginScreenState extends State<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    "Bienvenue sur Ping\nL'application académique de...",
+                    "Bienvenue sur Ping",
                     style: TextStyle(
-                      fontSize: 28,
+                      fontSize: 35,
                       color: Colors.white,
                       fontFamily: 'poppins',
                       height: 1.5,
                       fontWeight: FontWeight.w600,
                     ),
+                  ),
+                  Text("L'application académique...",
+
+                    style: TextStyle(
+                      fontSize: 20,
+                      color: Colors.white,
+                      fontFamily: 'poppins',
+                      height: 1.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+
                   ),
                   SizedBox(height: 10),
                   Text(
