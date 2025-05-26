@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:ping/theme/app_theme.dart';
-
-
+import 'package:ping/providers/user_provider.dart';
+import 'package:provider/provider.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -12,100 +12,165 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailC = TextEditingController();
   final _passC = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
   bool obsecureText = true;
   bool isLoading = false;
+
+  @override
+  void dispose() {
+    _emailC.dispose();
+    _passC.dispose();
+    super.dispose();
+  }
 
   void togglePasswordVisibility() {
     setState(() {
       obsecureText = !obsecureText;
     });
   }
+
+  String? validateEmail(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Veuillez entrer votre email';
+    }
+    if (!value.endsWith('@esisalama.org')) {
+      return 'Veuillez utiliser votre email ESIS';
+    }
+    return null;
+  }
+
+  String? validatePassword(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Veuillez entrer votre mot de passe';
+    }
+    if (value.length < 6) {
+      return 'Le mot de passe doit contenir au moins 6 caractères';
+    }
+    return null;
+  }
+
   Future<void> handleLogin() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
     setState(() {
       isLoading = true;
     });
 
     try {
-      final response = await Supabase.instance.client.auth.signInWithPassword(
-        email: _emailC.text.trim(),
-        password: _passC.text,
+      await Provider.of<UserProvider>(context, listen: false).login(
+        _emailC.text.trim(),
+        _passC.text,
       );
-      if (response.user != null) {
-        // 👇 Ici tu peux rediriger vers le dashboard par exemple
-        Navigator.pushReplacementNamed(context, '/profile');
+
+      if (!mounted) return;
+
+      final userRole = Provider.of<UserProvider>(context, listen: false).userRole;
+      if (userRole == 'professeur' || userRole == 'admin') {
+        Navigator.pushReplacementNamed(context, '/home');
+      } else if (userRole == 'etudiant') {
+        Navigator.pushReplacementNamed(context, '/home');
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Rôle utilisateur non reconnu: $userRole'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        await Provider.of<UserProvider>(context, listen: false).logout();
       }
     } on AuthException catch (error) {
-      print("Erreur d'authentification ");
+      String message;
+      switch (error.message) {
+        case 'Invalid login credentials':
+          message = 'Email ou mot de passe incorrect';
+          break;
+        case 'Email not confirmed':
+          message = 'Veuillez confirmer votre email avant de vous connecter';
+          break;
+        default:
+          message = 'Erreur de connexion: ${error.message}';
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } catch (error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Une erreur est survenue: ${error.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
   }
-    @override
-    Widget build(BuildContext context) {
-      return Scaffold(
-        backgroundColor: AppColor.primary,
-        body: ListView(
-          shrinkWrap: true,
-          children: [
-            Container(
-              height: MediaQuery
-                  .of(context)
-                  .size
-                  .height * 0.35,
-              width: MediaQuery
-                  .of(context)
-                  .size
-                  .width,
-              padding: EdgeInsets.only(left: 32),
-              decoration: BoxDecoration(
-                gradient: AppColor.primaryGradient,
-                image: DecorationImage(
-                  image: AssetImage('assets/images/pattern-1-1.png'),
-                  fit: BoxFit.cover,
-                ),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Bienvenue sur Ping",
-                    style: TextStyle(
-                      fontSize: 35,
-                      color: Colors.white,
-                      fontFamily: 'poppins',
-                      height: 1.5,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  Text("L'application académique...",
 
-                    style: TextStyle(
-                      fontSize: 20,
-                      color: Colors.white,
-                      fontFamily: 'poppins',
-                      height: 1.5,
-                      fontWeight: FontWeight.w600,
-                    ),
-
-                  ),
-                  SizedBox(height: 10),
-                  Text(
-                    "by m.paisible7",
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ],
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColor.primary,
+      body: ListView(
+        shrinkWrap: true,
+        children: [
+          Container(
+            height: MediaQuery.of(context).size.height * 0.35,
+            width: MediaQuery.of(context).size.width,
+            padding: EdgeInsets.only(left: 32),
+            decoration: BoxDecoration(
+              gradient: AppColor.primaryGradient,
+              image: DecorationImage(
+                image: AssetImage('assets/images/pattern-1-1.png'),
+                fit: BoxFit.cover,
               ),
             ),
-            Container(
-              height: MediaQuery
-                  .of(context)
-                  .size
-                  .height * 0.65,
-              width: MediaQuery
-                  .of(context)
-                  .size
-                  .width,
-              color: Colors.white,
-              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 36),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Bienvenue sur Ping",
+                  style: TextStyle(
+                    fontSize: 35,
+                    color: Colors.white,
+                    fontFamily: 'poppins',
+                    height: 1.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  "L'application académique...",
+                  style: TextStyle(
+                    fontSize: 20,
+                    color: Colors.white,
+                    fontFamily: 'poppins',
+                    height: 1.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                SizedBox(height: 10),
+                Text(
+                  "by m.paisible7",
+                  style: TextStyle(color: Colors.white),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            height: MediaQuery.of(context).size.height * 0.65,
+            width: MediaQuery.of(context).size.width,
+            color: Colors.white,
+            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 36),
+            child: Form(
+              key: _formKey,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -126,7 +191,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: AppColor.primarySoft),
                     ),
-                    child: TextField(
+                    child: TextFormField(
                       controller: _emailC,
                       style: TextStyle(fontSize: 14, fontFamily: 'poppins'),
                       decoration: InputDecoration(
@@ -144,6 +209,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           fontSize: 14,
                         ),
                       ),
+                      validator: validateEmail,
+                      keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
                     ),
                   ),
                   Container(
@@ -153,7 +221,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: AppColor.primarySoft),
                     ),
-                    child: TextField(
+                    child: TextFormField(
                       controller: _passC,
                       obscureText: obsecureText,
                       style: TextStyle(fontSize: 14, fontFamily: 'poppins'),
@@ -174,17 +242,15 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         suffixIcon: IconButton(
                           icon: Icon(
-                              Icons.remove_red_eye
+                            obsecureText ? Icons.visibility_off : Icons.visibility,
+                            color: AppColor.primarySoft,
                           ),
-
-                          /*icon: SvgPicture.asset(
-                          obsecureText
-                              ? 'assets/icons/show.svg'
-                              : 'assets/icons/hide.svg',
-                        ),*/
                           onPressed: togglePasswordVisibility,
                         ),
                       ),
+                      validator: validatePassword,
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) => handleLogin(),
                     ),
                   ),
                   SizedBox(
@@ -198,15 +264,24 @@ class _LoginScreenState extends State<LoginScreen> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                      child: Text(
-                        'Se connecter',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontFamily: 'poppins',
-                          fontWeight: FontWeight.w500,
-                          color: Colors.white,
-                        ),
-                      ),
+                      child: isLoading
+                          ? SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : Text(
+                              'Se connecter',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontFamily: 'poppins',
+                                fontWeight: FontWeight.w500,
+                                color: Colors.white,
+                              ),
+                            ),
                     ),
                   ),
                   Container(
@@ -215,17 +290,24 @@ class _LoginScreenState extends State<LoginScreen> {
                     alignment: Alignment.centerLeft,
                     child: TextButton(
                       onPressed: () {
-                        // Rediriger vers mot de passe oublié
+                        Navigator.pushNamed(context, '/reset-password');
                       },
-                      child: Text("Mot de passe oublié ?"),
+                      child: Text(
+                        "Mot de passe oublié ?",
+                        style: TextStyle(
+                          color: AppColor.primary,
+                          fontSize: 14,
+                        ),
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-          ],
-        ),
-      );
-    }
+          ),
+        ],
+      ),
+    );
   }
+}
 

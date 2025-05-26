@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_theme.dart';
-import '../widget/custom_bottom_navigation_bar.dart';
+import '../widgets/custom_bottom_navigation_bar.dart';
 
 class ProfileScreen extends StatefulWidget {
   @override
@@ -59,7 +59,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       extendBody: true,
       bottomNavigationBar: CustomBottomNavigationBar(
-      currentIndex: 3,
     ),
       body: FutureBuilder<Map<String, dynamic>?>(
         future: fetchUserProfile(),
