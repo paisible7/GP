@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:ping/providers/user_provider.dart';
 import 'package:ping/widgets/custom_bottom_navigation_bar.dart';
 import '../theme/app_theme.dart';
+import 'dart:convert';
 
 class ProfileScreen extends StatefulWidget {
   final bool showBottomNav;
@@ -17,6 +18,12 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  String _getAvatarUrl(String name) {
+    // Encoder le nom pour l'URL
+    final encodedName = Uri.encodeComponent(name);
+    return "https://ui-avatars.com/api/?name=$encodedName&background=random";
+  }
+
   void confirmLogout() {
     showDialog(
       context: context,
@@ -49,7 +56,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final userData = {
       'nom_complet': userProvider.userName,
       'role': userProvider.userRole,
-      'avatar': null, // Vous pouvez ajouter l'avatar dans le UserProvider si nécessaire
+      'avatar': null,
     };
 
     return Scaffold(
@@ -72,11 +79,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   height: 124,
                   color: Colors.blue,
                   child: Image.network(
-                    (userData["avatar"] == null || userData['avatar'] == "")
-                        ? "https://ui-avatars.com/api/?name=${userData['nom_complet']}"
-                        : userData['avatar']!
-                  ,
+                    _getAvatarUrl(userData['nom_complet'] ?? ''),
                     fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      // En cas d'erreur, afficher un avatar par défaut
+                      return Container(
+                        color: AppColor.primarySoft,
+                        child: Icon(
+                          Icons.person,
+                          size: 64,
+                          color: AppColor.primary,
+                        ),
+                      );
+                    },
                   ),
                 ),
               ),
@@ -109,12 +124,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   icon: const Icon(Icons.person),
                   onTap: () => Navigator.pushNamed(context, '/home'),
                 ),
-                if (userProvider.isAdmin)
-                  MenuTile(
-                    title: 'Ajouter un cours',
-                    icon: const Icon(Icons.people),
-                    onTap: () {},
-                  ),
                 MenuTile(
                   title: 'Changer le mot de passe',
                   icon: const Icon(Icons.password),
