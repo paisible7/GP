@@ -24,7 +24,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return "https://ui-avatars.com/api/?name=$encodedName&background=random";
   }
 
-  void confirmLogout() {
+  void confirmLogout() async {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -38,11 +40,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
           TextButton(
             child: const Text("Se déconnecter"),
             onPressed: () async {
-              Navigator.pop(context);
-              await Provider.of<UserProvider>(context, listen: false).signOut();
-              if (context.mounted) {
-                Navigator.pushReplacementNamed(context, '/login');
-              }
+              Navigator.pop(context); // Fermer la boîte de dialogue
+              
+              // Déconnecter l'utilisateur
+              await userProvider.signOut();
+              
+              // Vérifier si le contexte est toujours valide
+              if (!context.mounted) return;
+              
+              // Rediriger vers la page de connexion en supprimant toutes les routes précédentes
+              Navigator.of(context).pushNamedAndRemoveUntil(
+                '/login',
+                (route) => false, // Supprime toutes les routes précédentes
+              );
             },
           ),
         ],
@@ -53,9 +63,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context);
+    
+    // Vérifier si l'utilisateur est connecté
+    if (!userProvider.isLoggedIn) {
+      // Si l'utilisateur n'est pas connecté, rediriger vers la page de connexion
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          '/login',
+          (route) => false,
+        );
+      });
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     final userData = {
-      'nom_complet': userProvider.userName,
-      'role': userProvider.userRole,
+      'nom_complet': userProvider.userName ?? 'Utilisateur',
+      'role': userProvider.userRole ?? 'Non défini',
       'avatar': null,
     };
 
