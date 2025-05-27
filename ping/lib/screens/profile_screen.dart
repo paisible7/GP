@@ -1,45 +1,41 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:provider/provider.dart';
+import 'package:ping/providers/user_provider.dart';
+import 'package:ping/widgets/custom_bottom_navigation_bar.dart';
 import '../theme/app_theme.dart';
-import '../widgets/custom_bottom_navigation_bar.dart';
 
 class ProfileScreen extends StatefulWidget {
+  final bool showBottomNav;
+
+  const ProfileScreen({
+    Key? key,
+    this.showBottomNav = true,
+  }) : super(key: key);
+
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final supabase = Supabase.instance.client;
-
-  Future<Map<String, dynamic>?> fetchUserProfile() async {
-    final user = supabase.auth.currentUser;
-    if (user == null) return null;
-
-    final res = await supabase
-        .from('profiles')
-        .select()
-        .eq('id', user.id)
-        .single();
-
-    return res;
-  }
-
   void confirmLogout() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text("Se déconnecter ?"),
-        content: Text("Êtes-vous sûr de vouloir vous déconnecter ?"),
+        title: const Text("Se déconnecter ?"),
+        content: const Text("Êtes-vous sûr de vouloir vous déconnecter ?"),
         actions: [
           TextButton(
-            child: Text("Annuler"),
+            child: const Text("Annuler"),
             onPressed: () => Navigator.pop(context),
           ),
           TextButton(
-            child: Text("Se déconnecter"),
-            onPressed: () {
+            child: const Text("Se déconnecter"),
+            onPressed: () async {
               Navigator.pop(context);
-              logout();
+              await Provider.of<UserProvider>(context, listen: false).signOut();
+              if (context.mounted) {
+                Navigator.pushReplacementNamed(context, '/login');
+              }
             },
           ),
         ],
@@ -47,113 +43,97 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-
-  void logout() async {
-    await Supabase.instance.client.auth.signOut();
-    // Rediriger vers la page de login
-    Navigator.pushReplacementNamed(context, '/login');
-  }
-
   @override
   Widget build(BuildContext context) {
+    final userProvider = Provider.of<UserProvider>(context);
+    final userData = {
+      'nom_complet': userProvider.userName,
+      'role': userProvider.userRole,
+      'avatar': null, // Vous pouvez ajouter l'avatar dans le UserProvider si nécessaire
+    };
+
     return Scaffold(
       extendBody: true,
-      bottomNavigationBar: CustomBottomNavigationBar(
-    ),
-      body: FutureBuilder<Map<String, dynamic>?>(
-        future: fetchUserProfile(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
-          }
-
-          final userData = snapshot.data;
-
-          if (userData == null) {
-            return Center(child: Text('Erreur de chargement du profil'));
-          }
-
-          return ListView(
-            shrinkWrap: true,
-            physics: BouncingScrollPhysics(),
-            padding: EdgeInsets.symmetric(vertical: 36),
-
+      bottomNavigationBar: widget.showBottomNav ? const CustomBottomNavigationBar() : null,
+      body: ListView(
+        shrinkWrap: true,
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(vertical: 36),
+        children: [
+          const SizedBox(height: 16),
+          // section 1 - profile
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              SizedBox(height: 16),
-              // section 1 - profile
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  SizedBox(height: 20,),
-                  ClipOval(
-
-                    child: Container(
-                      width: 124,
-                      height: 124,
-                      color: Colors.blue,
-                      child: Image.network(
-                        (userData["avatar"] == null || userData['avatar'] == "")
-                            ? "https://ui-avatars.com/api/?name=${userData['nom_complet']}"
-                            : userData['avatar'],
-                        fit: BoxFit.cover,
-                      ),
-                    ),
+              const SizedBox(height: 20),
+              ClipOval(
+                child: Container(
+                  width: 124,
+                  height: 124,
+                  color: Colors.blue,
+                  child: Image.network(
+                    (userData["avatar"] == null || userData['avatar'] == "")
+                        ? "https://ui-avatars.com/api/?name=${userData['nom_complet']}"
+                        : userData['avatar']!
+                  ,
+                    fit: BoxFit.cover,
                   ),
-                  Container(
-                    margin: EdgeInsets.only(top: 16, bottom: 4),
-                    child: Text(
-                      userData["nom_complet"] ?? "",
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-                    ),
-                  ),
-                  Text(
-                    userData["role"] ?? "",
-                    style: TextStyle(color: AppColor.primary),
-                  ),
-                ],
-              ),
-              SizedBox(height: 15,),
-              // section 2 - menu
-              Container(
-                width: MediaQuery.of(context).size.width,
-                margin: EdgeInsets.only(top: 42),
-                child: Column(
-                  children: [
-                    MenuTile(
-                      title: 'Metttre à jour le profil',
-                      icon: Icon(Icons.person),
-                      onTap: () =>         Navigator.pushNamed(context, '/home')
-                    ),
-                    if (userData["role"] == "admin")
-                      MenuTile(
-                        title: 'Ajouter un cours',
-                        icon: Icon(Icons.people),
-                        onTap: (){}/*Navigator.pushReplacementNamed(context, '/home');*/
-                        ,
-                      ),
-                    MenuTile(
-                      title: 'Changer le mot de passe',
-                      icon: Icon(Icons.password),
-                      onTap: () =>  Navigator.pushNamed(context, '/change_password')
-                      ,
-                    ),
-
-                    MenuTile(
-                        title: 'Se déconnecter',
-                        icon: Icon(Icons.logout),
-                        onTap: confirmLogout,
-                        titleStyle: TextStyle(color: Colors.red)
-                    ),
-                    Container(
-                      height: 1,
-                      color: Colors.grey[200],
-                    ),
-                  ],
                 ),
               ),
+              Container(
+                margin: const EdgeInsets.only(top: 16, bottom: 4),
+                child: Text(
+                  userData["nom_complet"] ?? "",
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                ),
+              ),
+              Text(
+                userData["role"] == 'professeur'
+                    ? 'Professeur'
+                    : userData["role"] == 'etudiant'
+                        ? 'Étudiant'
+                        : 'Administrateur',
+                style: TextStyle(color: AppColor.primary),
+              ),
             ],
-          );
-        },
+          ),
+          const SizedBox(height: 15),
+          // section 2 - menu
+          Container(
+            width: MediaQuery.of(context).size.width,
+            margin: const EdgeInsets.only(top: 42),
+            child: Column(
+              children: [
+                MenuTile(
+                  title: 'Mettre à jour le profil',
+                  icon: const Icon(Icons.person),
+                  onTap: () => Navigator.pushNamed(context, '/home'),
+                ),
+                if (userProvider.isAdmin)
+                  MenuTile(
+                    title: 'Ajouter un cours',
+                    icon: const Icon(Icons.people),
+                    onTap: () {},
+                  ),
+                MenuTile(
+                  title: 'Changer le mot de passe',
+                  icon: const Icon(Icons.password),
+                  onTap: () => Navigator.pushNamed(context, '/change_password'),
+                ),
+                MenuTile(
+                  title: 'Se déconnecter',
+                  icon: const Icon(Icons.logout),
+                  onTap: confirmLogout,
+                  titleStyle: const TextStyle(color: Colors.red),
+                ),
+                Container(
+                  height: 1,
+                  color: Colors.grey[200],
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -162,10 +142,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 class MenuTile extends StatelessWidget {
   final String title;
   final Widget icon;
-  final void Function() onTap;
+  final VoidCallback onTap;
   final TextStyle? titleStyle;
 
   const MenuTile({
+    super.key,
     required this.title,
     required this.icon,
     required this.onTap,
@@ -177,7 +158,7 @@ class MenuTile extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         decoration: BoxDecoration(
           border: Border(
             top: BorderSide(
@@ -191,8 +172,8 @@ class MenuTile extends StatelessWidget {
             Container(
               width: 42,
               height: 42,
-              margin: EdgeInsets.only(right: 24),
-              padding: EdgeInsets.all(8),
+              margin: const EdgeInsets.only(right: 24),
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: AppColor.primarySoft,
                 borderRadius: BorderRadius.circular(100),
@@ -202,15 +183,14 @@ class MenuTile extends StatelessWidget {
             Expanded(
               child: Text(
                 title,
-                style: titleStyle ?? TextStyle(
+                style: titleStyle ?? const TextStyle(
                   fontWeight: FontWeight.w500,
                 ),
               ),
             ),
             Container(
-              margin: EdgeInsets.only(left: 24),
-              ),
-
+              margin: const EdgeInsets.only(left: 24),
+            ),
           ],
         ),
       ),

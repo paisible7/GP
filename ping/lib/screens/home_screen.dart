@@ -18,53 +18,30 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late final List<Widget> _pages;
+  late final NavigationProvider _navigationProvider;
 
   @override
   void initState() {
     super.initState();
+    _navigationProvider = Provider.of<NavigationProvider>(context, listen: false);
     _initializePages();
+    _navigationProvider.setIndex(0);
   }
 
   void _initializePages() {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     
     if (userProvider.userRole == 'admin') {
-      // Pour les administrateurs, on utilise le tableau de bord admin
       _pages = [
         const AdminDashboard(),
-         ProfileScreen(),
+        const ProfileScreen(showBottomNav: false),
       ];
     } else {
-      // Pour les professeurs et étudiants
+      // Pour les professeurs et étudiants, on utilise la page d'accueil
       _pages = [
-        Scaffold(
-          body: Center(
-            child: Text(
-              "Écran d'Accueil (${userProvider.userRole == 'professeur' ? 'Professeur' : 'Étudiant'})"
-            ),
-          ),
-        ),
-         ProfileScreen(),
+        const _HomePage(),
+        const ProfileScreen(showBottomNav: false),
       ];
-    }
-  }
-
-  void _handleActionButton() {
-    final userProvider = Provider.of<UserProvider>(context, listen: false);
-    final navigationProvider = Provider.of<NavigationProvider>(context, listen: false);
-
-    if (userProvider.userRole == 'professeur') {
-      // Pour les professeurs, naviguer vers l'écran de génération de QR
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const GenerateQRScreen()),
-      );
-    } else if (userProvider.userRole == 'etudiant') {
-      // Pour les étudiants, naviguer vers l'écran de scan
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const QRScannerScreen()),
-      );
     }
   }
 
@@ -73,24 +50,73 @@ class _HomeScreenState extends State<HomeScreen> {
     final navigationProvider = Provider.of<NavigationProvider>(context);
     final userProvider = Provider.of<UserProvider>(context);
 
+    if (userProvider.userRole == 'admin' && _pages[0] is! AdminDashboard ||
+        (userProvider.userRole == 'professeur' || userProvider.userRole == 'etudiant') && _pages[0] is! _HomePage) {
+      _initializePages();
+      _navigationProvider.setIndex(0);
+    }
+
     return Scaffold(
       body: IndexedStack(
         index: navigationProvider.currentIndex,
         children: _pages,
       ),
       bottomNavigationBar: const CustomBottomNavigationBar(),
-      floatingActionButton: userProvider.userRole != 'admin' 
-          ? FloatingActionButton(
-              onPressed: _handleActionButton,
-              backgroundColor: AppColor.primary,
-              child: Icon(
-                userProvider.userRole == 'professeur' 
-                    ? Icons.qr_code 
-                    : Icons.qr_code_scanner,
-                color: Colors.white,
-              ),
-            )
-          : null,
+    );
+  }
+}
+
+class _HomePage extends StatelessWidget {
+  const _HomePage();
+
+  @override
+  Widget build(BuildContext context) {
+    final userProvider = Provider.of<UserProvider>(context);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(userProvider.userRole == 'professeur' ? 'Accueil Professeur' : 'Accueil Étudiant'),
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'Bienvenue ${userProvider.userName}',
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 20),
+            Text(
+              userProvider.userRole == 'professeur' 
+                ? 'Utilisez le bouton ci-dessous pour générer un QR code'
+                : 'Utilisez le bouton ci-dessous pour scanner un QR code',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+          ],
+        ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          if (userProvider.userRole == 'professeur') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const GenerateQRScreen()),
+            );
+          } else {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const QRScannerScreen()),
+            );
+          }
+        },
+        icon: Icon(
+          userProvider.userRole == 'professeur' ? Icons.qr_code : Icons.qr_code_scanner,
+        ),
+        label: Text(
+          userProvider.userRole == 'professeur' ? 'Générer QR' : 'Scanner QR',
+        ),
+      ),
     );
   }
 }

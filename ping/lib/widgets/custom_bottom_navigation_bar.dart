@@ -1,32 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:ping/providers/navigation_provider.dart';
+import 'package:ping/providers/user_provider.dart';
 import 'package:ping/theme/app_theme.dart';
 
 class CustomBottomNavigationBar extends StatelessWidget {
-  const CustomBottomNavigationBar({Key? key}) : super(key: key);
+  const CustomBottomNavigationBar({super.key});
 
   @override
   Widget build(BuildContext context) {
     final navigationProvider = Provider.of<NavigationProvider>(context);
+    final userProvider = Provider.of<UserProvider>(context);
 
     return BottomNavigationBar(
-      items: const [
+      currentIndex: navigationProvider.currentIndex,
+      onTap: (index) => navigationProvider.setIndex(index),
+      items: [
         BottomNavigationBarItem(
-          icon: Icon(Icons.home),
-          label: 'Accueil',
+          icon: Icon(
+            userProvider.userRole == 'admin' ? Icons.dashboard : Icons.home,
+          ),
+          label: userProvider.userRole == 'admin' ? 'Tableau de bord' : 'Accueil',
         ),
-        BottomNavigationBarItem(
+        const BottomNavigationBarItem(
           icon: Icon(Icons.person),
           label: 'Profil',
         ),
       ],
-      currentIndex: navigationProvider.currentIndex,
-      onTap: (index) => navigationProvider.setCurrentIndex(index),
       selectedItemColor: AppColor.primary,
       unselectedItemColor: Colors.grey,
-      showUnselectedLabels: true,
-      type: BottomNavigationBarType.fixed,
     );
   }
 } 

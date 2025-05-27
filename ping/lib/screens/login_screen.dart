@@ -78,7 +78,7 @@ class _LoginScreenState extends State<LoginScreen> {
             backgroundColor: Colors.red,
           ),
         );
-        await Provider.of<UserProvider>(context, listen: false).logout();
+        await Provider.of<UserProvider>(context, listen: false).signOut();
       }
     } on AuthException catch (error) {
       String message;

@@ -1,18 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:ping/core/supabase_init.dart';
-import 'package:ping/providers/user_provider.dart';
-import 'package:ping/providers/navigation_provider.dart';
-import 'package:ping/screens/login_screen.dart';
-import 'package:ping/screens/profile_screen.dart';
-import 'package:ping/screens/scan_screen.dart';
-import 'package:ping/screens/reset_password_screen.dart';
-import 'package:ping/screens/new_password_screen.dart';
-import 'package:ping/screens/home_screen.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:ping/providers/navigation_provider.dart';
+import 'package:ping/providers/user_provider.dart';
+import 'package:ping/screens/login_screen.dart';
+import 'package:ping/screens/home_screen.dart';
+
+import 'core/supabase_init.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SupabaseConfig.initialize();
+
   runApp(const MyApp());
 }
 
@@ -23,34 +22,40 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(
-          create: (context) {
-            final provider = UserProvider();
-            // Initialiser l'état de l'utilisateur au démarrage
-            provider.initialize();
-            return provider;
-          },
-        ),
-        ChangeNotifierProvider(create: (context) => NavigationProvider()),
+        ChangeNotifierProvider(create: (_) => NavigationProvider()),
+        ChangeNotifierProvider(create: (_) => UserProvider()..initializeUser()),
       ],
-      child: Consumer<UserProvider>(
-        builder: (context, userProvider, _) {
-          return MaterialApp(
-            debugShowCheckedModeBanner: false,
-            title: "Ping",
-            // Rediriger vers la page d'accueil si l'utilisateur est connecté
-            initialRoute: userProvider.isLoggedIn ? '/home' : '/login',
-            routes: {
-              '/login': (context) => LoginScreen(),
-              '/reset-password': (context) => ResetPasswordScreen(),
-              '/new-password': (context) => NewPasswordScreen(),
-              '/home': (context) => HomeScreen(),
-              '/profile': (context) => ProfileScreen(),
-              '/scan': (context) => QRScannerScreen(),
-            },
-          );
+      child: MaterialApp(
+        title: 'Ping',
+        theme: ThemeData(
+          primarySwatch: Colors.blue,
+          useMaterial3: true,
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Colors.blue,
+            foregroundColor: Colors.white,
+          ),
+        ),
+        initialRoute: '/',
+        routes: {
+          '/': (context) => const AuthWrapper(),
+          '/login': (context) => LoginScreen(),
+          '/home': (context) => const HomeScreen(),
         },
       ),
     );
+  }
+}
+
+class AuthWrapper extends StatelessWidget {
+  const AuthWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final userProvider = Provider.of<UserProvider>(context);
+    
+    if (userProvider.isLoggedIn) {
+      return const HomeScreen();
+    }
+    return LoginScreen();
   }
 }
