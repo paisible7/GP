@@ -20,7 +20,7 @@ class CustomBottomNavigationBar extends StatelessWidget {
           icon: Icon(
             userProvider.userRole == 'admin' ? Icons.dashboard : Icons.home,
           ),
-          label: userProvider.userRole == 'admin' ? 'Tableau de bord' : 'Accueil',
+          label: userProvider.userRole == 'admin' ? 'Dashboard' : 'Accueil',
         ),
         const BottomNavigationBarItem(
           icon: Icon(Icons.person),

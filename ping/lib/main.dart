@@ -27,14 +27,6 @@ class MyApp extends StatelessWidget {
       ],
       child: MaterialApp(
         title: 'Ping',
-        theme: ThemeData(
-          primarySwatch: Colors.blue,
-          useMaterial3: true,
-          appBarTheme: const AppBarTheme(
-            backgroundColor: Colors.blue,
-            foregroundColor: Colors.white,
-          ),
-        ),
         initialRoute: '/',
         routes: {
           '/': (context) => const AuthWrapper(),

@@ -110,65 +110,65 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() {
           isLoading = false;
         });
-      }
     }
   }
+  }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColor.primary,
-      body: ListView(
-        shrinkWrap: true,
-        children: [
-          Container(
+    @override
+    Widget build(BuildContext context) {
+      return Scaffold(
+        backgroundColor: AppColor.primary,
+        body: ListView(
+          shrinkWrap: true,
+          children: [
+            Container(
             height: MediaQuery.of(context).size.height * 0.35,
             width: MediaQuery.of(context).size.width,
-            padding: EdgeInsets.only(left: 32),
-            decoration: BoxDecoration(
-              gradient: AppColor.primaryGradient,
-              image: DecorationImage(
-                image: AssetImage('assets/images/pattern-1-1.png'),
-                fit: BoxFit.cover,
-              ),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "Bienvenue sur Ping",
-                  style: TextStyle(
-                    fontSize: 35,
-                    color: Colors.white,
-                    fontFamily: 'poppins',
-                    height: 1.5,
-                    fontWeight: FontWeight.w600,
-                  ),
+              padding: EdgeInsets.only(left: 32),
+              decoration: BoxDecoration(
+                gradient: AppColor.primaryGradient,
+                image: DecorationImage(
+                  image: AssetImage('assets/images/pattern-1-1.png'),
+                  fit: BoxFit.cover,
                 ),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Bienvenue sur Ping",
+                    style: TextStyle(
+                      fontSize: 35,
+                      color: Colors.white,
+                      fontFamily: 'poppins',
+                      height: 1.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 Text(
                   "L'application académique...",
-                  style: TextStyle(
-                    fontSize: 20,
-                    color: Colors.white,
-                    fontFamily: 'poppins',
-                    height: 1.5,
-                    fontWeight: FontWeight.w600,
+                    style: TextStyle(
+                      fontSize: 20,
+                      color: Colors.white,
+                      fontFamily: 'poppins',
+                      height: 1.5,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                SizedBox(height: 10),
-                Text(
-                  "by m.paisible7",
-                  style: TextStyle(color: Colors.white),
-                ),
-              ],
+                  SizedBox(height: 10),
+                  Text(
+                    "by m.paisible7",
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ],
+              ),
             ),
-          ),
-          Container(
+            Container(
             height: MediaQuery.of(context).size.height * 0.65,
             width: MediaQuery.of(context).size.width,
-            color: Colors.white,
-            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 36),
+              color: Colors.white,
+              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 36),
             child: Form(
               key: _formKey,
               child: Column(
@@ -274,14 +274,14 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             )
                           : Text(
-                              'Se connecter',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontFamily: 'poppins',
-                                fontWeight: FontWeight.w500,
-                                color: Colors.white,
-                              ),
-                            ),
+                        'Se connecter',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontFamily: 'poppins',
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
                   ),
                   Container(
@@ -303,11 +303,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ],
               ),
+              ),
             ),
-          ),
-        ],
-      ),
-    );
+          ],
+        ),
+      );
+    }
   }
-}
 

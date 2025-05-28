@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class AppColor {
-  static const Color primary = Color(0xFF2C4D9C); // Bleu
+  static const Color primary = Color(0xFF001492); // Bleu
   static const Color secondary = Color(0xFF53AE32); // Vert
   static const Color textColor = Colors.black; // Texte
   static const Color background = Colors.white;
@@ -14,7 +14,7 @@ class AppColor {
   static const Color warning = Color(0xFFEB8600);
 
   static const Gradient primaryGradient = LinearGradient(
-    colors: [Color(0xFF2C4D9C), Color(0xFF53AE32)],
+    colors: [Color(0xFF001492), Color(0xFF53AE32)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );

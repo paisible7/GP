@@ -17,7 +17,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  late final List<Widget> _pages;
+  List<Widget>? _pages;
   late final NavigationProvider _navigationProvider;
 
   @override
@@ -50,16 +50,30 @@ class _HomeScreenState extends State<HomeScreen> {
     final navigationProvider = Provider.of<NavigationProvider>(context);
     final userProvider = Provider.of<UserProvider>(context);
 
-    if (userProvider.userRole == 'admin' && _pages[0] is! AdminDashboard ||
-        (userProvider.userRole == 'professeur' || userProvider.userRole == 'etudiant') && _pages[0] is! _HomePage) {
-      _initializePages();
-      _navigationProvider.setIndex(0);
+    // Vérifier si les pages doivent être mises à jour
+    if (_pages == null || 
+        (userProvider.userRole == 'admin' && _pages![0] is! AdminDashboard) ||
+        ((userProvider.userRole == 'professeur' || userProvider.userRole == 'etudiant') && _pages![0] is! _HomePage)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _initializePages();
+            _navigationProvider.setIndex(0);
+          });
+        }
+      });
+    }
+
+    if (_pages == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
     }
 
     return Scaffold(
       body: IndexedStack(
         index: navigationProvider.currentIndex,
-        children: _pages,
+        children: _pages!,
       ),
       bottomNavigationBar: const CustomBottomNavigationBar(),
     );
@@ -75,7 +89,15 @@ class _HomePage extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(userProvider.userRole == 'professeur' ? 'Accueil Professeur' : 'Accueil Étudiant'),
+        toolbarHeight: 100.0,
+        //title: Text(userProvider.userRole == 'professeur' ? 'Accueil Professeur' : 'Accueil Étudiant'),
+        title: Text('Ping', style: TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 30,
+        ),),
+        backgroundColor: AppColor.primary,
+        foregroundColor: Colors.white,
+
       ),
       body: Center(
         child: Column(
@@ -98,24 +120,19 @@ class _HomePage extends StatelessWidget {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          if (userProvider.userRole == 'professeur') {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const GenerateQRScreen()),
-            );
-          } else {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const QRScannerScreen()),
-            );
-          }
+          userProvider.userRole == 'professeur'
+              ? Navigator.push(context, MaterialPageRoute(builder: (context) => const GenerateQRScreen()),)
+              : Navigator.push(context, MaterialPageRoute(builder: (context) => const QRScannerScreen()),);
         },
         icon: Icon(
-          userProvider.userRole == 'professeur' ? Icons.qr_code : Icons.qr_code_scanner,
+          (userProvider.userRole == 'professeur' ? Icons.qr_code : Icons.qr_code_scanner),
+          color: Colors.white,
         ),
         label: Text(
-          userProvider.userRole == 'professeur' ? 'Générer QR' : 'Scanner QR',
+            (userProvider.userRole == 'professeur' ? 'Générer QR' : 'Scanner QR'),
+          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
         ),
+        backgroundColor: AppColor.primary,
       ),
     );
   }

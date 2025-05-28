@@ -48,8 +48,8 @@
 		<key>UIStatusBarHidden</key>
 		<false/>
 		<key>NSCameraUsageDescription</key>
-        <string>Cette application nécessite l'accès à la caméra pour prendre des photos.</string>
-        <key>NSLocationWhenInUseUsageDescription</key>
-        <string>Cette application nécessite l'accès à votre position pour fournir des fonctionnalités basées sur la localisation.</string>
+		<string>Cette application nécessite l'accès à la caméra pour prendre des photos.</string>
+		<key>NSLocationWhenInUseUsageDescription</key>
+		<string>Cette application nécessite l'accès à votre position pour fournir des fonctionnalités basées sur la localisation.</string>
 	</dict>
 </plist>

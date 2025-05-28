@@ -118,7 +118,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
 
       if (DateTime.now().isAfter(sessionEndTime)) {
         throw Exception('La session a expiré.');
-      }
+  }
 
       final sessionId = sessionData['id'] as String;
       final coursId = sessionData['cours_id'] as String?;
@@ -227,7 +227,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
                     Icons.location_off,
                     size: 64,
                     color: Colors.red,
-                  ),
+          ),
                   const SizedBox(height: 16),
                   Text(
                     _scanError ?? 'Erreur de localisation',
@@ -316,8 +316,8 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
                     },
                   ),
                 ],
-              ),
             ),
+          ),
         ],
       ),
     );

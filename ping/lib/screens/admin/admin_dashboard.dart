@@ -11,7 +11,9 @@ class AdminDashboard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Tableau de bord administrateur'),
+        toolbarHeight: 100.0,
+        title: const Text('Dashboard', style: TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.bold),),
+        backgroundColor: AppColor.primary,
       ),
       body: GridView.count(
         crossAxisCount: 2,
