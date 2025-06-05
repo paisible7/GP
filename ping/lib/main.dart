@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:ping/providers/navigation_provider.dart';
 import 'package:ping/providers/user_provider.dart';
 import 'package:ping/screens/login_screen.dart';
 import 'package:ping/screens/home_screen.dart';
-
 import 'core/supabase_init.dart';
 
 void main() async {
@@ -26,6 +24,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => UserProvider()..initializeUser()),
       ],
       child: MaterialApp(
+        debugShowCheckedModeBanner: false,
         title: 'Ping',
         initialRoute: '/',
         routes: {
