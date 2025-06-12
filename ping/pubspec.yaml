@@ -88,6 +88,7 @@ flutter:
     - assets/images/pattern-1-1.png
     - assets/images/LOGO_FAIRE_LA_DIFFERENCE.png
     - assets/images/LOGODIFF.png
+    - assets/images/LOGO_UDBL.png
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see

@@ -326,204 +326,248 @@ class _LoginScreenState extends State<LoginScreen> {
             desktop: Row(
               children: [
                 Expanded(
+                  flex: 2,
                   child: Container(
-                    height: MediaQuery.of(context).size.height * 1.0,
-                    width: MediaQuery.of(context).size.width * 1.0,
-                    padding: EdgeInsets.only(left: 100),
+                    height: MediaQuery.of(context).size.height,
+                    padding: EdgeInsets.only(left: 80),
                     decoration: BoxDecoration(
-                      gradient: AppColor.primaryGradient,
+                      gradient: AppColor.deskPrimaryGradient,
                       image: DecorationImage(
                         alignment: Alignment.bottomCenter,
-                        image: AssetImage('assets/images/pattern-1-1.png',),
-                        fit: BoxFit.cover,
+                        image: AssetImage('assets/images/pattern-1.png'),
+                        fit: BoxFit.contain,
+                        opacity: 0.4,
                       ),
                     ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          "Bienvenue sur Ping",
-                          style: TextStyle(
-                            fontSize: 35,
-                            color: Colors.white,
-                            fontFamily: 'poppins',
-                            height: 1.5,
-                            fontWeight: FontWeight.w600,
+                        Container(
+                          padding: EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+                          child: Text(
+                            "Bienvenue sur Ping",
+                            style: TextStyle(
+                              fontSize: 48,
+                              color: Colors.white,
+                              fontFamily: 'poppins',
+                              height: 1.2,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.5,
+                            ),
                           ),
                         ),
-                        Text(
-                          "L'application académique...",
-                          style: TextStyle(
-                            fontSize: 20,
-                            color: Colors.white,
-                            fontFamily: 'poppins',
-                            height: 1.5,
-                            fontWeight: FontWeight.w600,
+                        Container(
+                          padding: EdgeInsets.symmetric(vertical: 8, horizontal: 24),
+                          child: Text(
+                            "L'application académique...",
+                            style: TextStyle(
+                              fontSize: 28,
+                              color: Colors.white,
+                              fontFamily: 'poppins',
+                              height: 1.3,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: -0.3,
+                            ),
                           ),
-                        ),
-                        SizedBox(height: 10),
-                        Text(
-                          "by m.paisible7",
-                          style: TextStyle(color: Colors.white),
                         ),
                       ],
                     ),
                   ),
                 ),
                 Expanded(
+                  flex: 1,
                   child: Container(
-                    height: MediaQuery.of(context).size.height * 1.0,
-                    width: MediaQuery.of(context).size.width * 1.0,
+                    height: MediaQuery.of(context).size.height,
                     color: Colors.white,
-                    padding: EdgeInsets.symmetric(horizontal: 170, vertical: 250),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Se connecter',
-                            style: TextStyle(
-                              fontSize: 30,
-                              fontFamily: 'poppins',
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          SizedBox(height: 24),
-                          Container(
-                            padding: EdgeInsets.symmetric(horizontal: 20),
-                            margin: EdgeInsets.only(bottom: 26),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppColor.primarySoft),
-                            ),
-                            child: TextFormField(
-                              controller: _emailC,
-                              style: TextStyle(
-                                fontSize: 24,
-                                fontFamily: 'poppins',
-                              ),
-                              decoration: InputDecoration(
-                                labelText: "Email",
-                                hintText: "matricule@esisalama.org",
-                                border: InputBorder.none,
-                                floatingLabelBehavior:
-                                    FloatingLabelBehavior.always,
-                                hintStyle: TextStyle(
-                                  fontSize: 24,
-                                  color: AppColor.primarySoft,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                labelStyle: TextStyle(
-                                  color: AppColor.primarySoft,
-                                  fontSize: 24,
-                                ),
-                              ),
-                              validator: validateEmail,
-                              keyboardType: TextInputType.emailAddress,
-                              textInputAction: TextInputAction.next,
-                            ),
-                          ),
-                          Container(
-                            padding: EdgeInsets.symmetric(horizontal: 14),
-                            margin: EdgeInsets.only(bottom: 24),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppColor.primarySoft),
-                            ),
-                            child: TextFormField(
-                              controller: _passC,
-                              obscureText: obsecureText,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontFamily: 'poppins',
-                              ),
-                              decoration: InputDecoration(
-                                labelText: "Password",
-                                hintText: "*************",
-                                border: InputBorder.none,
-                                floatingLabelBehavior:
-                                    FloatingLabelBehavior.always,
-                                labelStyle: TextStyle(
-                                  color: AppColor.primarySoft,
-                                  fontSize: 14,
-                                ),
-                                hintStyle: TextStyle(
-                                  fontSize: 14,
-                                  fontFamily: 'poppins',
-                                  fontWeight: FontWeight.w500,
-                                  color: AppColor.primarySoft,
-                                ),
-                                suffixIcon: IconButton(
-                                  icon: Icon(
-                                    obsecureText
-                                        ? Icons.visibility_off
-                                        : Icons.visibility,
-                                    color: AppColor.primarySoft,
-                                  ),
-                                  onPressed: togglePasswordVisibility,
-                                ),
-                              ),
-                              validator: validatePassword,
-                              textInputAction: TextInputAction.done,
-                              onFieldSubmitted: (_) => handleLogin(),
-                            ),
-                          ),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: isLoading ? null : handleLogin,
-                              style: ElevatedButton.styleFrom(
-                                padding: EdgeInsets.symmetric(vertical: 18),
-                                backgroundColor: AppColor.primary,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                              child:
-                                  isLoading
-                                      ? SizedBox(
-                                        height: 20,
-                                        width: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor:
-                                              AlwaysStoppedAnimation<Color>(
-                                                Colors.white,
-                                              ),
-                                        ),
-                                      )
-                                      : Text(
-                                        'Se connecter',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontFamily: 'poppins',
-                                          fontWeight: FontWeight.w500,
-                                          color: Colors.white,
-                                        ),
+                    padding: EdgeInsets.symmetric(horizontal: 80, vertical: 0),
+                    child: Center(
+                      child: SingleChildScrollView(
+                        child: Container(
+                          constraints: BoxConstraints(maxWidth: 500),
+                          child: Form(
+                            key: _formKey,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  padding: EdgeInsets.only(bottom: 8),
+                                  decoration: BoxDecoration(
+                                    border: Border(
+                                      bottom: BorderSide(
+                                        color: AppColor.primary.withOpacity(0.2),
+                                        width: 2,
                                       ),
-                            ),
-                          ),
-                          Container(
-                            width: double.infinity,
-                            margin: EdgeInsets.only(top: 4),
-                            alignment: Alignment.centerLeft,
-                            child: TextButton(
-                              onPressed: () {
-                                Navigator.pushNamed(context, '/reset-password');
-                              },
-                              child: Text(
-                                "Mot de passe oublié ?",
-                                style: TextStyle(
-                                  color: AppColor.primary,
-                                  fontSize: 14,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    'Se connecter',
+                                    style: TextStyle(
+                                      fontSize: 36,
+                                      fontFamily: 'poppins',
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.black,
+                                      letterSpacing: -0.5,
+                                    ),
+                                  ),
                                 ),
-                              ),
+                                SizedBox(height: 40),
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 20),
+                                  margin: EdgeInsets.only(bottom: 24),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: AppColor.primarySoft),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppColor.primarySoft.withOpacity(0.1),
+                                        blurRadius: 8,
+                                        offset: Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: TextFormField(
+                                    controller: _emailC,
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontFamily: 'poppins',
+                                    ),
+                                    decoration: InputDecoration(
+                                      labelText: "Email",
+                                      hintText: "matricule@esisalama.org",
+                                      border: InputBorder.none,
+                                      floatingLabelBehavior: FloatingLabelBehavior.always,
+                                      hintStyle: TextStyle(
+                                        fontSize: 16,
+                                        color: AppColor.primarySoft,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                      labelStyle: TextStyle(
+                                        color: AppColor.primary,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    validator: validateEmail,
+                                    keyboardType: TextInputType.emailAddress,
+                                    textInputAction: TextInputAction.next,
+                                  ),
+                                ),
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 20),
+                                  margin: EdgeInsets.only(bottom: 32),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: AppColor.primarySoft),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppColor.primarySoft.withOpacity(0.1),
+                                        blurRadius: 8,
+                                        offset: Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: TextFormField(
+                                    controller: _passC,
+                                    obscureText: obsecureText,
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontFamily: 'poppins',
+                                    ),
+                                    decoration: InputDecoration(
+                                      labelText: "Password",
+                                      hintText: "*************",
+                                      border: InputBorder.none,
+                                      floatingLabelBehavior: FloatingLabelBehavior.always,
+                                      labelStyle: TextStyle(
+                                        color: AppColor.primary,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                      hintStyle: TextStyle(
+                                        fontSize: 16,
+                                        fontFamily: 'poppins',
+                                        fontWeight: FontWeight.w500,
+                                        color: AppColor.primarySoft,
+                                      ),
+                                      suffixIcon: IconButton(
+                                        icon: Icon(
+                                          obsecureText ? Icons.visibility_off : Icons.visibility,
+                                          color: AppColor.primary,
+                                          size: 24,
+                                        ),
+                                        onPressed: togglePasswordVisibility,
+                                      ),
+                                    ),
+                                    validator: validatePassword,
+                                    textInputAction: TextInputAction.done,
+                                    onFieldSubmitted: (_) => handleLogin(),
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton(
+                                    onPressed: isLoading ? null : handleLogin,
+                                    style: ElevatedButton.styleFrom(
+                                      padding: EdgeInsets.symmetric(vertical: 20),
+                                      backgroundColor: AppColor.primary,
+                                      elevation: 4,
+                                      shadowColor: AppColor.primary.withOpacity(0.3),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    child: isLoading
+                                        ? SizedBox(
+                                            height: 24,
+                                            width: 24,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                            ),
+                                          )
+                                        : Text(
+                                            'Se connecter',
+                                            style: TextStyle(
+                                              fontSize: 18,
+                                              fontFamily: 'poppins',
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.white,
+                                              letterSpacing: 0.5,
+                                            ),
+                                          ),
+                                  ),
+                                ),
+                                Container(
+                                  width: double.infinity,
+                                  margin: EdgeInsets.only(top: 20),
+                                  alignment: Alignment.centerLeft,
+                                  child: TextButton(
+                                    onPressed: () {
+                                      Navigator.pushNamed(context, '/reset-password');
+                                    },
+                                    style: TextButton.styleFrom(
+                                      padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      "Mot de passe oublié ?",
+                                      style: TextStyle(
+                                        color: AppColor.primary,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
+                        ),
                       ),
                     ),
                   ),

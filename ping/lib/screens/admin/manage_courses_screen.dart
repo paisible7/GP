@@ -3,7 +3,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:ping/theme/app_theme.dart';
 
 class ManageCoursesScreen extends StatefulWidget {
-  const ManageCoursesScreen({Key? key}) : super(key: key);
+  final String level;
+  final String? filiere;
+
+  const ManageCoursesScreen({
+    Key? key,
+    required this.level,
+    this.filiere,
+  }) : super(key: key);
 
   @override
   State<ManageCoursesScreen> createState() => _ManageCoursesScreenState();
@@ -11,14 +18,14 @@ class ManageCoursesScreen extends StatefulWidget {
 
 class _ManageCoursesScreenState extends State<ManageCoursesScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _horaireController = TextEditingController();
-  String? _selectedProfessorId;
-  String? _selectedRoomId;
-  bool _isLoading = false;
+  final _courseController = TextEditingController();
+  final _professorController = TextEditingController();
+  final _roomController = TextEditingController();
+  final _timeController = TextEditingController();
   List<Map<String, dynamic>> _courses = [];
   List<Map<String, dynamic>> _professors = [];
   List<Map<String, dynamic>> _rooms = [];
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -28,8 +35,10 @@ class _ManageCoursesScreenState extends State<ManageCoursesScreen> {
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _horaireController.dispose();
+    _courseController.dispose();
+    _professorController.dispose();
+    _roomController.dispose();
+    _timeController.dispose();
     super.dispose();
   }
 
@@ -69,253 +78,294 @@ class _ManageCoursesScreenState extends State<ManageCoursesScreen> {
     }
   }
 
-  Future<void> _addCourse() async {
-    if (!_formKey.currentState!.validate()) return;
-    if (_selectedProfessorId == null || _selectedRoomId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez sélectionner un professeur et une salle')),
-      );
-      return;
-    }
-
-    setState(() => _isLoading = true);
-    try {
-      await Supabase.instance.client.from('cours').insert({
-        'nom': _nameController.text.trim(),
-        'horaire': _horaireController.text.trim(),
-        'professeur_id': _selectedProfessorId,
-        'salle_id': _selectedRoomId,
+  void _addCourse() {
+    if (_formKey.currentState!.validate()) {
+      setState(() {
+        _courses.add({
+          'name': _courseController.text,
+          'professor': _professorController.text,
+          'room': _roomController.text,
+          'time': _timeController.text,
+        });
       });
-
-      // Réinitialiser le formulaire
-      _nameController.clear();
-      _horaireController.clear();
-      _selectedProfessorId = null;
-      _selectedRoomId = null;
-
-      // Recharger les données
-      await _loadData();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cours ajouté avec succès')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur lors de l\'ajout du cours: $e')),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      _courseController.clear();
+      _professorController.clear();
+      _roomController.clear();
+      _timeController.clear();
+      Navigator.pop(context);
     }
   }
 
-  Future<void> _deleteCourse(String courseId) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirmer la suppression'),
-        content: const Text('Êtes-vous sûr de vouloir supprimer ce cours ?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Annuler'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Supprimer'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-
-    setState(() => _isLoading = true);
-    try {
-      await Supabase.instance.client
-          .from('cours')
-          .delete()
-          .eq('id', courseId);
-
-      // Recharger les données
-      await _loadData();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cours supprimé avec succès')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur lors de la suppression: $e')),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
-  void _showAddCourseDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Ajouter un cours'),
-        content: SingleChildScrollView(
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Nom du cours',
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Veuillez entrer un nom';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _horaireController,
-                  decoration: const InputDecoration(
-                    labelText: 'Horaire',
-                    hintText: 'ex: Lundi 8h-10h',
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Veuillez entrer un horaire';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  decoration: const InputDecoration(
-                    labelText: 'Professeur',
-                  ),
-                  value: _selectedProfessorId,
-                  items: _professors.map((professor) {
-                    return DropdownMenuItem<String>(
-                      value: professor['id'] as String,
-                      child: Text(professor['nom_complet'] as String),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedProfessorId = value;
-                    });
-                  },
-                  validator: (value) {
-                    if (value == null) {
-                      return 'Veuillez sélectionner un professeur';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  decoration: const InputDecoration(
-                    labelText: 'Salle',
-                  ),
-                  value: _selectedRoomId,
-                  items: _rooms.map((room) {
-                    return DropdownMenuItem<String>(
-                      value: room['id'] as String,
-                      child: Text(room['nom'] as String),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedRoomId = value;
-                    });
-                  },
-                  validator: (value) {
-                    if (value == null) {
-                      return 'Veuillez sélectionner une salle';
-                    }
-                    return null;
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _addCourse();
-            },
-            child: const Text('Ajouter'),
-          ),
-        ],
-      ),
-    );
+  void _deleteCourse(int index) {
+    setState(() {
+      _courses.removeAt(index);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Gérer les Cours'),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _courses.length,
-              itemBuilder: (context, index) {
-                final course = _courses[index];
-                final professor = course['professeur'] as Map<String, dynamic>?;
-                final room = course['salle'] as Map<String, dynamic>?;
-                
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      child: Text(
-                        course['nom']?[0] ?? '?',
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                      backgroundColor: AppColor.primary,
-                    ),
-                    title: Text(course['nom'] ?? ''),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Horaire: ${course['horaire']}'),
-                        Text('Professeur: ${professor?['nom_complet'] ?? 'Non assigné'}'),
-                        Text('Salle: ${room?['nom'] ?? 'Non assignée'}'),
-                      ],
-                    ),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () => _deleteCourse(course['id']),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Card(
+          elevation: 4,
+          shadowColor: AppColor.primary.withOpacity(0.2),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Ajouter un cours',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: AppColor.primary,
+                      fontFamily: 'poppins',
                     ),
                   ),
-                );
-              },
+                  const SizedBox(height: 24),
+                  TextFormField(
+                    controller: _courseController,
+                    decoration: InputDecoration(
+                      labelText: 'Nom du cours',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      prefixIcon: const Icon(Icons.book),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Veuillez entrer le nom du cours';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _professorController,
+                    decoration: InputDecoration(
+                      labelText: 'Professeur',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      prefixIcon: const Icon(Icons.person),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Veuillez entrer le nom du professeur';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _roomController,
+                    decoration: InputDecoration(
+                      labelText: 'Salle',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      prefixIcon: const Icon(Icons.class_),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Veuillez entrer la salle';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _timeController,
+                    decoration: InputDecoration(
+                      labelText: 'Horaire',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      prefixIcon: const Icon(Icons.access_time),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Veuillez entrer l\'horaire';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _addCourse,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColor.primary,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Ajouter le cours',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'poppins',
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showAddCourseDialog,
-        child: const Icon(Icons.add),
-      ),
+          ),
+        ),
+        const SizedBox(height: 24),
+        Expanded(
+          child: Card(
+            elevation: 4,
+            shadowColor: AppColor.primary.withOpacity(0.2),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Liste des cours',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: AppColor.primary,
+                          fontFamily: 'poppins',
+                        ),
+                      ),
+                      Text(
+                        '${widget.level}${widget.filiere != null ? ' - ${widget.filiere}' : ''}',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.grey[600],
+                          fontFamily: 'poppins',
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: _courses.length,
+                      itemBuilder: (context, index) {
+                        final course = _courses[index];
+                        return Card(
+                          elevation: 2,
+                          margin: const EdgeInsets.only(bottom: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.all(16),
+                            leading: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: AppColor.primary.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(
+                                Icons.book,
+                                color: AppColor.primary,
+                                size: 24,
+                              ),
+                            ),
+                            title: Text(
+                              course['name'],
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'poppins',
+                              ),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.person,
+                                      size: 16,
+                                      color: Colors.grey,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      course['professor'],
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.class_,
+                                      size: 16,
+                                      color: Colors.grey,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      course['room'],
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    const Icon(
+                                      Icons.access_time,
+                                      size: 16,
+                                      color: Colors.grey,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      course['time'],
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            trailing: IconButton(
+                              icon: const Icon(
+                                Icons.delete,
+                                color: Colors.red,
+                              ),
+                              onPressed: () => _deleteCourse(index),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 } 

@@ -18,6 +18,14 @@ class AppColor {
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
+
+  static const Gradient deskPrimaryGradient = LinearGradient(
+    colors: [Color(0xFF001492), Color(0xFF02780B)],
+    stops: [0.01, 0.9],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+
+  );
 }
 
 

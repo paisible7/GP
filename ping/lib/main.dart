@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ping/screens/profile_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:ping/providers/navigation_provider.dart';
 import 'package:ping/providers/user_provider.dart';
@@ -31,6 +32,7 @@ class MyApp extends StatelessWidget {
           '/': (context) => const AuthWrapper(),
           '/login': (context) => LoginScreen(),
           '/home': (context) => const HomeScreen(),
+          '/profil': (context) => const ProfileScreen(),
         },
       ),
     );

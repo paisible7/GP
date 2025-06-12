@@ -17,10 +17,9 @@ class CustomBottomNavigationBar extends StatelessWidget {
       onTap: (index) => navigationProvider.setIndex(index),
       items: [
         BottomNavigationBarItem(
-          icon: Icon(
-            userProvider.userRole == 'admin' ? Icons.dashboard : Icons.home,
+          icon: Icon(Icons.home,
           ),
-          label: userProvider.userRole == 'admin' ? 'Dashboard' : 'Accueil',
+          label:'Accueil',
         ),
         const BottomNavigationBarItem(
           icon: Icon(Icons.person),

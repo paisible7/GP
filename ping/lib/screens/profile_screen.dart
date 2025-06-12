@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:ping/providers/user_provider.dart';
-import 'package:ping/widgets/custom_bottom_navigation_bar.dart';
 import '../theme/app_theme.dart';
 import 'dart:convert';
 
@@ -26,7 +25,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void confirmLogout() async {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -41,13 +40,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: const Text("Se déconnecter"),
             onPressed: () async {
               Navigator.pop(context); // Fermer la boîte de dialogue
-              
+
               // Déconnecter l'utilisateur
               await userProvider.signOut();
-              
+
               // Vérifier si le contexte est toujours valide
               if (!context.mounted) return;
-              
+
               // Rediriger vers la page de connexion en supprimant toutes les routes précédentes
               Navigator.of(context).pushNamedAndRemoveUntil(
                 '/login',
@@ -63,7 +62,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context);
-    
+
     // Vérifier si l'utilisateur est connecté
     if (!userProvider.isLoggedIn) {
       // Si l'utilisateur n'est pas connecté, rediriger vers la page de connexion
@@ -82,9 +81,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
       'avatar': null,
     };
 
+    /*
+    * if (showBottom  & userProvider.userRole == 'admin') {
+    * ne pas afficher la barre de nav
+    * else afficher pours les autres users
+    *
+    * */
+
     return Scaffold(
+      appBar: AppBar(
+        leading:
+          IconButton(
+            alignment: Alignment.center,
+              onPressed: (){
+      print("Bouton retour pressé"); // Ajoutez un print
+      if (Navigator.of(context).canPop()) {
+        print("Peut popper. Appel de pop...");
+        Navigator.of(context).pop();
+      } else {
+        print("Ne peut pas popper.");
+      }
+              }
+              , icon: Icon(Icons.arrow_back))
+        ,
+        title: Text("Profile"),
+      ),
       extendBody: true,
-      bottomNavigationBar: widget.showBottomNav ? const CustomBottomNavigationBar() : null,
       body: ListView(
         shrinkWrap: true,
         physics: const BouncingScrollPhysics(),

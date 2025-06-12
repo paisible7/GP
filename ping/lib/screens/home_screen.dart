@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:ping/providers/navigation_provider.dart';
 import 'package:ping/providers/user_provider.dart';
-import 'package:ping/widgets/custom_bottom_navigation_bar.dart';
 import 'package:ping/screens/scan_screen.dart';
 import 'package:ping/screens/profile_screen.dart';
 import 'package:ping/screens/generate_qr_screen.dart';
@@ -30,19 +29,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _initializePages() {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
-    
-    if (userProvider.userRole == 'admin') {
-      _pages = [
-        const AdminDashboard(),
-        const ProfileScreen(showBottomNav: false),
-      ];
-    } else {
-      // Pour les professeurs et étudiants, on utilise la page d'accueil
-      _pages = [
-        const _HomePage(),
-        const ProfileScreen(showBottomNav: false),
-      ];
-    }
+    // Pour les professeurs et étudiants, on utilise la page d'accueil
+    userProvider.userRole == 'admin' ?
+    (_pages = [
+      const AdminDashboard(),
+    ]):
+    (  _pages = [
+    const _HomePage(),
+    const ProfileScreen(showBottomNav: false),
+    ]);
+
   }
 
   @override
@@ -75,7 +71,6 @@ class _HomeScreenState extends State<HomeScreen> {
         index: navigationProvider.currentIndex,
         children: _pages!,
       ),
-      bottomNavigationBar: const CustomBottomNavigationBar(),
     );
   }
 }
@@ -91,12 +86,36 @@ class _HomePage extends StatelessWidget {
       appBar: AppBar(
         toolbarHeight: 100.0,
         //title: Text(userProvider.userRole == 'professeur' ? 'Accueil Professeur' : 'Accueil Étudiant'),
-        title: Text('Ping', style: TextStyle(
+        title: Text('Accueil', style: TextStyle(
           fontWeight: FontWeight.bold,
           fontSize: 30,
         ),),
         backgroundColor: AppColor.primary,
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications, color: Colors.white),
+            onPressed: () {
+              // TODO: Implémenter les notifications
+            },
+          ),
+          Container(
+
+            margin: const EdgeInsets.only(right: 8),
+            child: IconButton(
+              onPressed: () {
+                Navigator.pushNamed(context, '/profil');
+              },
+              icon: CircleAvatar(
+                backgroundColor: Colors.white.withOpacity(0.2),
+                child: const Icon(
+                  Icons.person,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ],
 
       ),
       body: Center(
