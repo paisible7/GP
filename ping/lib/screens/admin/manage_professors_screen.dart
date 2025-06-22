@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:ping/theme/app_theme.dart';
+import 'package:ping/core/data_service.dart';
+import 'package:ping/widgets/skeleton_loader.dart';
 
 class ManageProfessorsScreen extends StatefulWidget {
   const ManageProfessorsScreen({Key? key}) : super(key: key);
@@ -17,6 +18,9 @@ class _ManageProfessorsScreenState extends State<ManageProfessorsScreen> {
   bool _isLoading = false;
   List<Map<String, dynamic>> _professors = [];
 
+  // Ajout du champ de recherche
+  final TextEditingController _searchController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -28,20 +32,16 @@ class _ManageProfessorsScreenState extends State<ManageProfessorsScreen> {
     _emailController.dispose();
     _nameController.dispose();
     _passwordController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
   Future<void> _loadProfessors() async {
     setState(() => _isLoading = true);
     try {
-      final data = await Supabase.instance.client
-          .from('profiles')
-          .select()
-          .eq('role', 'professeur')
-          .order('nom_complet');
-      
+      final data = await DataService.getProfessors();
       setState(() {
-        _professors = List<Map<String, dynamic>>.from(data);
+        _professors = data;
       });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -57,26 +57,11 @@ class _ManageProfessorsScreenState extends State<ManageProfessorsScreen> {
 
     setState(() => _isLoading = true);
     try {
-      // Créer l'utilisateur dans Supabase Auth
-      final authResponse = await Supabase.instance.client.auth.admin.createUser(
-        AdminUserAttributes(
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
-          emailConfirm: true,
-        ),
+      await DataService.addProfessor(
+        email: _emailController.text.trim(),
+        name: _nameController.text.trim(),
+        password: _passwordController.text,
       );
-
-      if (authResponse.user == null) {
-        throw Exception('Erreur lors de la création du compte');
-      }
-
-      // Ajouter le profil dans la table profiles
-      await Supabase.instance.client.from('profiles').insert({
-        'id': authResponse.user!.id,
-        'email': _emailController.text.trim(),
-        'nom_complet': _nameController.text.trim(),
-        'role': 'professeur',
-      });
 
       // Réinitialiser le formulaire
       _emailController.clear();
@@ -127,14 +112,7 @@ class _ManageProfessorsScreenState extends State<ManageProfessorsScreen> {
 
     setState(() => _isLoading = true);
     try {
-      // Supprimer le profil
-      await Supabase.instance.client
-          .from('profiles')
-          .delete()
-          .eq('id', professorId);
-
-      // Supprimer l'utilisateur de l'auth
-      await Supabase.instance.client.auth.admin.deleteUser(professorId);
+      await DataService.deleteProfessor(professorId);
 
       // Recharger la liste
       await _loadProfessors();
@@ -222,11 +200,14 @@ class _ManageProfessorsScreenState extends State<ManageProfessorsScreen> {
             child: const Text('Annuler'),
           ),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _addProfessor();
-            },
-            child: const Text('Ajouter'),
+            onPressed: _isLoading ? null : _addProfessor,
+            child: _isLoading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Ajouter'),
           ),
         ],
       ),
@@ -235,36 +216,66 @@ class _ManageProfessorsScreenState extends State<ManageProfessorsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    String search = _searchController.text.trim().toLowerCase();
+    List<Map<String, dynamic>> filteredProfessors = _professors.where((prof) {
+      final nom = (prof['nom_complet'] ?? '').toString().toLowerCase();
+      final email = (prof['email'] ?? '').toString().toLowerCase();
+      return search.isEmpty || nom.contains(search) || email.contains(search);
+    }).toList();
     return Scaffold(
       appBar: AppBar(
         title: const Text('Gérer les Professeurs'),
+        backgroundColor: AppColor.primary,
+        foregroundColor: Colors.white,
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _professors.length,
-              itemBuilder: (context, index) {
-                final professor = _professors[index];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      child: Text(
-                        professor['nom_complet']?[0] ?? '?',
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                      backgroundColor: AppColor.primary,
+          ? const SimpleListSkeleton()
+          : Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.search),
+                      hintText: 'Rechercher par nom ou email...',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                     ),
-                    title: Text(professor['nom_complet'] ?? ''),
-                    subtitle: Text(professor['email'] ?? ''),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () => _deleteProfessor(professor['id']),
-                    ),
+                    onChanged: (value) {
+                      setState(() {});
+                    },
                   ),
-                );
-              },
+                ),
+                Expanded(
+                  child: filteredProfessors.isEmpty
+                      ? const Center(child: Text('Aucun professeur trouvé'))
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: filteredProfessors.length,
+                          itemBuilder: (context, index) {
+                            final professor = filteredProfessors[index];
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              child: ListTile(
+                                leading: CircleAvatar(
+                                  child: Text(
+                                    professor['nom_complet']?[0] ?? '?',
+                                    style: const TextStyle(color: Colors.white),
+                                  ),
+                                  backgroundColor: AppColor.primary,
+                                ),
+                                title: Text(professor['nom_complet'] ?? ''),
+                                subtitle: Text(professor['email'] ?? ''),
+                                trailing: IconButton(
+                                  icon: const Icon(Icons.delete, color: Colors.red),
+                                  onPressed: () => _deleteProfessor(professor['id']),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
             ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddProfessorDialog,

@@ -6,11 +6,12 @@ import 'package:ping/providers/user_provider.dart';
 import 'package:ping/screens/login_screen.dart';
 import 'package:ping/screens/home_screen.dart';
 import 'core/supabase_init.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SupabaseConfig.initialize();
-
+  await initializeDateFormatting('fr_FR', null);
   runApp(const MyApp());
 }
 

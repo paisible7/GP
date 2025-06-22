@@ -17,12 +17,6 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  String _getAvatarUrl(String name) {
-    // Encoder le nom pour l'URL
-    final encodedName = Uri.encodeComponent(name);
-    return "https://ui-avatars.com/api/?name=$encodedName&background=random";
-  }
-
   void confirmLogout() async {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
 
@@ -118,25 +112,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const SizedBox(height: 20),
-              ClipOval(
-                child: Container(
-                  width: 124,
-                  height: 124,
-                  color: Colors.blue,
-                  child: Image.network(
-                    _getAvatarUrl(userData['nom_complet'] ?? ''),
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      // En cas d'erreur, afficher un avatar par défaut
-                      return Container(
-                        color: AppColor.primarySoft,
-                        child: Icon(
-                          Icons.person,
-                          size: 64,
-                          color: AppColor.primary,
-                        ),
-                      );
-                    },
+              CircleAvatar(
+                radius: 62,
+                backgroundColor: AppColor.primary,
+                child: Text(
+                  (userData['nom_complet'] ?? 'U')[0].toUpperCase(),
+                  style: const TextStyle(
+                    fontSize: 48,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
                 ),
               ),

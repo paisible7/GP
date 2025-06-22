@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:ping/theme/app_theme.dart';
+import 'package:ping/core/data_service.dart';
+import 'package:ping/widgets/skeleton_loader.dart';
 
 class ManageRoomsScreen extends StatefulWidget {
   const ManageRoomsScreen({Key? key}) : super(key: key);
@@ -12,6 +13,7 @@ class ManageRoomsScreen extends StatefulWidget {
 class _ManageRoomsScreenState extends State<ManageRoomsScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final _descriptionController = TextEditingController();
   final _latitudeMinController = TextEditingController();
   final _latitudeMaxController = TextEditingController();
   final _longitudeMinController = TextEditingController();
@@ -28,6 +30,7 @@ class _ManageRoomsScreenState extends State<ManageRoomsScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _descriptionController.dispose();
     _latitudeMinController.dispose();
     _latitudeMaxController.dispose();
     _longitudeMinController.dispose();
@@ -38,13 +41,9 @@ class _ManageRoomsScreenState extends State<ManageRoomsScreen> {
   Future<void> _loadRooms() async {
     setState(() => _isLoading = true);
     try {
-      final data = await Supabase.instance.client
-          .from('salles_de_cours')
-          .select()
-          .order('nom');
-      
+      final data = await DataService.getRooms();
       setState(() {
-        _rooms = List<Map<String, dynamic>>.from(data);
+        _rooms = data;
       });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -60,16 +59,20 @@ class _ManageRoomsScreenState extends State<ManageRoomsScreen> {
 
     setState(() => _isLoading = true);
     try {
-      await Supabase.instance.client.from('salles_de_cours').insert({
-        'nom': _nameController.text.trim(),
-        'latitude_min': double.parse(_latitudeMinController.text),
-        'latitude_max': double.parse(_latitudeMaxController.text),
-        'longitude_min': double.parse(_longitudeMinController.text),
-        'longitude_max': double.parse(_longitudeMaxController.text),
-      });
+      await DataService.addRoom(
+        name: _nameController.text.trim(),
+        description: _descriptionController.text.trim().isEmpty 
+            ? null 
+            : _descriptionController.text.trim(),
+        latitudeMin: double.parse(_latitudeMinController.text),
+        latitudeMax: double.parse(_latitudeMaxController.text),
+        longitudeMin: double.parse(_longitudeMinController.text),
+        longitudeMax: double.parse(_longitudeMaxController.text),
+      );
 
       // Réinitialiser le formulaire
       _nameController.clear();
+      _descriptionController.clear();
       _latitudeMinController.clear();
       _latitudeMaxController.clear();
       _longitudeMinController.clear();
@@ -119,10 +122,7 @@ class _ManageRoomsScreenState extends State<ManageRoomsScreen> {
 
     setState(() => _isLoading = true);
     try {
-      await Supabase.instance.client
-          .from('salles_de_cours')
-          .delete()
-          .eq('id', roomId);
+      await DataService.deleteRoom(roomId);
 
       // Recharger la liste
       await _loadRooms();
@@ -170,6 +170,13 @@ class _ManageRoomsScreenState extends State<ManageRoomsScreen> {
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
+                  controller: _descriptionController,
+                  decoration: const InputDecoration(
+                    labelText: 'Description (optionnel)',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
                   controller: _latitudeMinController,
                   decoration: const InputDecoration(
                     labelText: 'Latitude minimale',
@@ -200,11 +207,6 @@ class _ManageRoomsScreenState extends State<ManageRoomsScreen> {
                     }
                     if (double.tryParse(value) == null) {
                       return 'Veuillez entrer un nombre valide';
-                    }
-                    final min = double.tryParse(_latitudeMinController.text);
-                    final max = double.tryParse(value);
-                    if (min != null && max != null && max <= min) {
-                      return 'La latitude max doit être supérieure à la latitude min';
                     }
                     return null;
                   },
@@ -242,11 +244,6 @@ class _ManageRoomsScreenState extends State<ManageRoomsScreen> {
                     if (double.tryParse(value) == null) {
                       return 'Veuillez entrer un nombre valide';
                     }
-                    final min = double.tryParse(_longitudeMinController.text);
-                    final max = double.tryParse(value);
-                    if (min != null && max != null && max <= min) {
-                      return 'La longitude max doit être supérieure à la longitude min';
-                    }
                     return null;
                   },
                 ),
@@ -260,11 +257,14 @@ class _ManageRoomsScreenState extends State<ManageRoomsScreen> {
             child: const Text('Annuler'),
           ),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _addRoom();
-            },
-            child: const Text('Ajouter'),
+            onPressed: _isLoading ? null : _addRoom,
+            child: _isLoading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Ajouter'),
           ),
         ],
       ),
@@ -276,44 +276,52 @@ class _ManageRoomsScreenState extends State<ManageRoomsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Gérer les Salles'),
+        backgroundColor: AppColor.primary,
+        foregroundColor: Colors.white,
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _rooms.length,
-              itemBuilder: (context, index) {
-                final room = _rooms[index];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      child: Text(
-                        room['nom']?[0] ?? '?',
-                        style: const TextStyle(color: Colors.white),
+          ? const SimpleListSkeleton()
+          : Column(
+              children: [
+                ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _rooms.length,
+                  itemBuilder: (context, index) {
+                    final room = _rooms[index];
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          child: Text(
+                            room['nom']?[0] ?? '?',
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                          backgroundColor: AppColor.primary,
+                        ),
+                        title: Text(room['nom'] ?? ''),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (room['description'] != null && room['description'].isNotEmpty)
+                              Text('Description: ${room['description']}'),
+                            Text('Latitude: ${room['latitude_min']} - ${room['latitude_max']}'),
+                            Text('Longitude: ${room['longitude_min']} - ${room['longitude_max']}'),
+                          ],
+                        ),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () => _deleteRoom(room['id']),
+                        ),
                       ),
-                      backgroundColor: AppColor.primary,
-                    ),
-                    title: Text(room['nom'] ?? ''),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Latitude: ${room['latitude_min']} - ${room['latitude_max']}'),
-                        Text('Longitude: ${room['longitude_min']} - ${room['longitude_max']}'),
-                      ],
-                    ),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () => _deleteRoom(room['id']),
-                    ),
-                  ),
-                );
-              },
+                    );
+                  },
+                ),
+                FloatingActionButton(
+                  onPressed: _showAddRoomDialog,
+                  child: const Icon(Icons.add),
+                ),
+              ],
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showAddRoomDialog,
-        child: const Icon(Icons.add),
-      ),
     );
   }
 } 

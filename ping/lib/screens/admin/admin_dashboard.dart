@@ -5,8 +5,10 @@ import 'package:ping/screens/admin/manage_professors_screen.dart';
 import 'package:ping/screens/admin/manage_rooms_screen.dart';
 import 'package:ping/screens/admin/manage_courses_screen.dart';
 import 'package:ping/screens/admin/manage_students_screen.dart';
+import 'package:ping/screens/admin/statistics_screen.dart';
 import 'package:ping/widgets/admin_sidebar.dart';
 import 'package:ping/responsive.dart';
+import 'package:ping/core/data_service.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -18,6 +20,33 @@ class AdminDashboard extends StatefulWidget {
 class _AdminDashboardState extends State<AdminDashboard> {
   int _selectedIndex = 0;
   bool _isSidebarCollapsed = false;
+  Map<String, int> _stats = {};
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStats();
+  }
+
+  Future<void> _loadStats() async {
+    try {
+      final stats = await DataService.getDashboardStats();
+      setState(() {
+        _stats = stats;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur lors du chargement des statistiques: $e')),
+        );
+      }
+    }
+  }
 
   Widget _getScreen() {
     switch (_selectedIndex) {
@@ -38,7 +67,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       case 7:
         return _buildCoursesScreen('L4');
       case 8:
-        return _buildStatsPlaceholder();
+        return const StatisticsScreen();
       case 9:
         return _buildSettingsPlaceholder();
       default:
@@ -203,65 +232,84 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ),
           ),
           const SizedBox(height: 16),
-          Expanded(
-            child: GridView.count(
-              crossAxisCount: Responsive.isDesktop(context) ? 4 : 2,
-              mainAxisSpacing: Responsive.isDesktop(context) ? 24 : 16,
-              crossAxisSpacing: Responsive.isDesktop(context) ? 24 : 16,
-              childAspectRatio: Responsive.isDesktop(context) ? 1.5 : 1.3,
-              padding: EdgeInsets.zero,
-              children: [
-                _buildStatCard(
-                  'Total Étudiants',
-                  '250',
-                  Icons.school,
-                  AppColor.primary,
-                ),
-                _buildStatCard(
-                  'Total Professeurs',
-                  '25',
-                  Icons.people,
-                  AppColor.secondary,
-                ),
-                _buildStatCard(
-                  'Total Cours',
-                  '45',
-                  Icons.book,
-                  Colors.orange,
-                ),
-                _buildStatCard(
-                  'Total Salles',
-                  '15',
-                  Icons.class_,
-                  Colors.purple,
-                ),
-                _buildStatCard(
-                  'Cours Aujourd\'hui',
-                  '12',
-                  Icons.calendar_today,
-                  Colors.teal,
-                ),
-                _buildStatCard(
-                  'Présences',
-                  '85%',
-                  Icons.check_circle,
-                  Colors.green,
-                ),
-                _buildStatCard(
-                  'Étudiants L1',
-                  '80',
-                  Icons.grade,
-                  Colors.blue,
-                ),
-                _buildStatCard(
-                  'Étudiants L2',
-                  '65',
-                  Icons.grade,
-                  Colors.indigo,
-                ),
-              ],
+          if (_isLoading)
+            const Expanded(
+              child: Center(
+                child: CircularProgressIndicator(),
+              ),
+            )
+          else
+            Expanded(
+              child: GridView.count(
+                crossAxisCount: Responsive.isDesktop(context) ? 5 : 2,
+                mainAxisSpacing: Responsive.isDesktop(context) ? 24 : 16,
+                crossAxisSpacing: Responsive.isDesktop(context) ? 24 : 16,
+                childAspectRatio: Responsive.isDesktop(context) ? 1.3 : 1.2,
+                padding: EdgeInsets.zero,
+                children: [
+                  _buildStatCard(
+                    'Total Étudiants',
+                    _stats['totalStudents']?.toString() ?? '0',
+                    Icons.school,
+                    AppColor.primary,
+                  ),
+                  _buildStatCard(
+                    'Total Professeurs',
+                    _stats['totalProfessors']?.toString() ?? '0',
+                    Icons.people,
+                    AppColor.primary,
+                  ),
+                  _buildStatCard(
+                    'Total Cours',
+                    _stats['totalCourses']?.toString() ?? '0',
+                    Icons.book,
+                    AppColor.primary,
+                  ),
+                  _buildStatCard(
+                    'Total Salles',
+                    _stats['totalRooms']?.toString() ?? '0',
+                    Icons.class_,
+                    AppColor.primary,
+                  ),
+                  _buildStatCard(
+                    'Cours Aujourd\'hui',
+                    _stats['todaySessions']?.toString() ?? '0',
+                    Icons.calendar_today,
+                    AppColor.primary,
+                  ),
+                  _buildStatCard(
+                    'Présences',
+                    '${_stats['presenceRate']?.toString() ?? '0'}%',
+                    Icons.check_circle,
+                    AppColor.primary,
+                  ),
+                  _buildStatCard(
+                    'Étudiants L1',
+                    _stats['l1Students']?.toString() ?? '0',
+                    Icons.grade,
+                    AppColor.primary,
+                  ),
+                  _buildStatCard(
+                    'Étudiants L2',
+                    _stats['l2Students']?.toString() ?? '0',
+                    Icons.grade,
+                    AppColor.primary,
+                  ),
+                  _buildStatCard(
+                    'Étudiants L3',
+                    _stats['l3Students']?.toString() ?? '0',
+                    Icons.grade,
+                    AppColor.primary,
+                  ),
+                  _buildStatCard(
+                    'Étudiants L4',
+                    _stats['l4Students']?.toString() ?? '0',
+                    Icons.grade,
+                    AppColor.primary,
+                  ),
+                ],
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -389,7 +437,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 },
               ),
               Container(
-
                 margin: const EdgeInsets.only(right: 8),
                 child: IconButton(
                     onPressed: () {

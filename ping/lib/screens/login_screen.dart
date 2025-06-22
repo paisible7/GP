@@ -160,7 +160,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       SizedBox(height: 10),
                       Text(
-                        "by m.paisible7",
+                        "par le groupe 5",
                         style: TextStyle(color: Colors.white),
                       ),
                     ],

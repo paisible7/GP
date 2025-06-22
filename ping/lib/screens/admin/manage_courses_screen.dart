@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:ping/theme/app_theme.dart';
+import 'package:ping/core/data_service.dart';
+import 'package:ping/widgets/skeleton_loader.dart';
+import 'package:ping/screens/admin/planify_session_screen.dart';
 
 class ManageCoursesScreen extends StatefulWidget {
   final String level;
@@ -26,6 +28,11 @@ class _ManageCoursesScreenState extends State<ManageCoursesScreen> {
   List<Map<String, dynamic>> _professors = [];
   List<Map<String, dynamic>> _rooms = [];
   bool _isLoading = false;
+  String? _selectedProfessorId;
+  String? _selectedRoomId;
+
+  // Ajout du champ de recherche
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -39,6 +46,7 @@ class _ManageCoursesScreenState extends State<ManageCoursesScreen> {
     _professorController.dispose();
     _roomController.dispose();
     _timeController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -46,28 +54,18 @@ class _ManageCoursesScreenState extends State<ManageCoursesScreen> {
     setState(() => _isLoading = true);
     try {
       // Charger les cours
-      final coursesData = await Supabase.instance.client
-          .from('cours')
-          .select('*, professeur:profiles(nom_complet), salle:salles_de_cours(nom)')
-          .order('nom');
+      final coursesData = await DataService.getCourses();
       
       // Charger les professeurs
-      final professorsData = await Supabase.instance.client
-          .from('profiles')
-          .select()
-          .eq('role', 'professeur')
-          .order('nom_complet');
+      final professorsData = await DataService.getProfessors();
 
       // Charger les salles
-      final roomsData = await Supabase.instance.client
-          .from('salles_de_cours')
-          .select()
-          .order('nom');
+      final roomsData = await DataService.getRooms();
 
       setState(() {
-        _courses = List<Map<String, dynamic>>.from(coursesData);
-        _professors = List<Map<String, dynamic>>.from(professorsData);
-        _rooms = List<Map<String, dynamic>>.from(roomsData);
+        _courses = coursesData;
+        _professors = professorsData;
+        _rooms = roomsData;
       });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -78,294 +76,340 @@ class _ManageCoursesScreenState extends State<ManageCoursesScreen> {
     }
   }
 
-  void _addCourse() {
-    if (_formKey.currentState!.validate()) {
-      setState(() {
-        _courses.add({
-          'name': _courseController.text,
-          'professor': _professorController.text,
-          'room': _roomController.text,
-          'time': _timeController.text,
-        });
-      });
+  Future<void> _addCourse() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+    try {
+      await DataService.addCourse(
+        name: _courseController.text.trim(),
+        time: _timeController.text.trim(),
+        professorId: _selectedProfessorId,
+        roomId: _selectedRoomId,
+      );
+
+      // Réinitialiser le formulaire
       _courseController.clear();
-      _professorController.clear();
-      _roomController.clear();
       _timeController.clear();
-      Navigator.pop(context);
+      _selectedProfessorId = null;
+      _selectedRoomId = null;
+
+      // Recharger les données
+      await _loadData();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Cours ajouté avec succès')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur lors de l\'ajout du cours: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
-  void _deleteCourse(int index) {
-    setState(() {
-      _courses.removeAt(index);
-    });
+  Future<void> _deleteCourse(String courseId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirmer la suppression'),
+        content: const Text('Êtes-vous sûr de vouloir supprimer ce cours ?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isLoading = true);
+    try {
+      await DataService.deleteCourse(courseId);
+
+      // Recharger les données
+      await _loadData();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Cours supprimé avec succès')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur lors de la suppression: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Card(
-          elevation: 4,
-          shadowColor: AppColor.primary.withOpacity(0.2),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Ajouter un cours',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: AppColor.primary,
-                      fontFamily: 'poppins',
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  TextFormField(
-                    controller: _courseController,
+    String search = _searchController.text.trim().toLowerCase();
+    List<Map<String, dynamic>> filteredCourses = _courses.where((course) {
+      final nom = (course['nom'] ?? '').toString().toLowerCase();
+      final prof = (course['professeur']?['profiles']?['nom_complet'] ?? '').toString().toLowerCase();
+      return search.isEmpty || nom.contains(search) || prof.contains(search);
+    }).toList();
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Gérer les Cours'),
+        backgroundColor: AppColor.primary,
+        foregroundColor: Colors.white,
+      ),
+      body: _isLoading
+          ? const SimpleListSkeleton()
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: TextField(
+                    controller: _searchController,
                     decoration: InputDecoration(
-                      labelText: 'Nom du cours',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      prefixIcon: const Icon(Icons.book),
+                      prefixIcon: const Icon(Icons.search),
+                      hintText: 'Rechercher par nom de cours ou professeur...',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                     ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Veuillez entrer le nom du cours';
-                      }
-                      return null;
+                    onChanged: (value) {
+                      setState(() {});
                     },
                   ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _professorController,
-                    decoration: InputDecoration(
-                      labelText: 'Professeur',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      prefixIcon: const Icon(Icons.person),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Veuillez entrer le nom du professeur';
-                      }
-                      return null;
-                    },
+                ),
+                Card(
+                  elevation: 4,
+                  shadowColor: AppColor.primary.withOpacity(0.2),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _roomController,
-                    decoration: InputDecoration(
-                      labelText: 'Salle',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      prefixIcon: const Icon(Icons.class_),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Veuillez entrer la salle';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _timeController,
-                    decoration: InputDecoration(
-                      labelText: 'Horaire',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      prefixIcon: const Icon(Icons.access_time),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Veuillez entrer l\'horaire';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _addCourse,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColor.primary,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text(
-                        'Ajouter le cours',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'poppins',
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 24),
-        Expanded(
-          child: Card(
-            elevation: 4,
-            shadowColor: AppColor.primary.withOpacity(0.2),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Liste des cours',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: AppColor.primary,
-                          fontFamily: 'poppins',
-                        ),
-                      ),
-                      Text(
-                        '${widget.level}${widget.filiere != null ? ' - ${widget.filiere}' : ''}',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey[600],
-                          fontFamily: 'poppins',
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: _courses.length,
-                      itemBuilder: (context, index) {
-                        final course = _courses[index];
-                        return Card(
-                          elevation: 2,
-                          margin: const EdgeInsets.only(bottom: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Ajouter un cours',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: AppColor.primary,
+                              fontFamily: 'poppins',
+                            ),
                           ),
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.all(16),
-                            leading: Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: AppColor.primary.withOpacity(0.1),
+                          const SizedBox(height: 24),
+                          TextFormField(
+                            controller: _courseController,
+                            decoration: InputDecoration(
+                              labelText: 'Nom du cours',
+                              border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              child: Icon(
-                                Icons.book,
-                                color: AppColor.primary,
-                                size: 24,
-                              ),
+                              prefixIcon: const Icon(Icons.book),
                             ),
-                            title: Text(
-                              course['name'],
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                fontFamily: 'poppins',
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Veuillez entrer le nom du cours';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          DropdownButtonFormField<String>(
+                            value: _selectedProfessorId,
+                            decoration: InputDecoration(
+                              labelText: 'Professeur',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
                               ),
+                              prefixIcon: const Icon(Icons.person),
                             ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.person,
-                                      size: 16,
-                                      color: Colors.grey,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      course['professor'],
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                  ],
+                            items: [
+                              const DropdownMenuItem<String>(
+                                value: null,
+                                child: Text('Sélectionner un professeur'),
+                              ),
+                              ..._professors.map((professor) {
+                                return DropdownMenuItem<String>(
+                                  value: professor['id'],
+                                  child: Text(professor['nom_complet']),
+                                );
+                              }).toList(),
+                            ],
+                            onChanged: (value) {
+                              setState(() {
+                                _selectedProfessorId = value;
+                              });
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          DropdownButtonFormField<String>(
+                            value: _selectedRoomId,
+                            decoration: InputDecoration(
+                              labelText: 'Salle',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              prefixIcon: const Icon(Icons.class_),
+                            ),
+                            items: [
+                              const DropdownMenuItem<String>(
+                                value: null,
+                                child: Text('Sélectionner une salle'),
+                              ),
+                              ..._rooms.map((room) {
+                                return DropdownMenuItem<String>(
+                                  value: room['id'],
+                                  child: Text(room['nom']),
+                                );
+                              }).toList(),
+                            ],
+                            onChanged: (value) {
+                              setState(() {
+                                _selectedRoomId = value;
+                              });
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _timeController,
+                            decoration: InputDecoration(
+                              labelText: 'Horaire',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              prefixIcon: const Icon(Icons.access_time),
+                              hintText: 'ex: 08:00',
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Veuillez entrer l\'horaire';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 24),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: _isLoading ? null : _addCourse,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColor.primary,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.class_,
-                                      size: 16,
-                                      color: Colors.grey,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      course['room'],
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 16),
-                                    const Icon(
-                                      Icons.access_time,
-                                      size: 16,
-                                      color: Colors.grey,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      course['time'],
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                            trailing: IconButton(
-                              icon: const Icon(
-                                Icons.delete,
-                                color: Colors.red,
                               ),
-                              onPressed: () => _deleteCourse(index),
+                              child: _isLoading
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      ),
+                                    )
+                                  : const Text(
+                                      'Ajouter le cours',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        fontFamily: 'poppins',
+                                      ),
+                                    ),
                             ),
                           ),
-                        );
-                      },
+                        ],
+                      ),
                     ),
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 24),
+                Expanded(
+                  child: _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : filteredCourses.isEmpty
+                          ? const Center(
+                              child: Text(
+                                'Aucun cours trouvé',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            )
+                          : ListView.builder(
+                              itemCount: filteredCourses.length,
+                              itemBuilder: (context, index) {
+                                final course = filteredCourses[index];
+                                return Card(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  child: ListTile(
+                                    title: Text(
+                                      course['nom'] ?? 'Cours sans nom',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontFamily: 'poppins',
+                                      ),
+                                    ),
+                                    subtitle: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        if (course['professeur'] != null)
+                                          Text('Professeur: ${course['professeur']['profiles']['nom_complet']}'),
+                                        if (course['salle'] != null)
+                                          Text('Salle: ${course['salle']['nom']}'),
+                                        Text('Horaire: ${course['horaire'] ?? 'Non défini'}'),
+                                      ],
+                                    ),
+                                    trailing: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(
+                                          icon: const Icon(Icons.event_available, color: Colors.blue),
+                                          tooltip: 'Planifier une séance',
+                                          onPressed: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) => PlanifySessionScreen(course: course),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.delete, color: Colors.red),
+                                          onPressed: () => _deleteCourse(course['id']),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                ),
+              ],
             ),
-          ),
-        ),
-      ],
     );
   }
 } 
