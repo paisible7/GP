@@ -7,11 +7,13 @@ import 'package:ping/screens/admin/planify_session_screen.dart';
 class ManageCoursesScreen extends StatefulWidget {
   final String level;
   final String? filiere;
+  final bool modal;
 
   const ManageCoursesScreen({
     Key? key,
     required this.level,
     this.filiere,
+    this.modal = false,
   }) : super(key: key);
 
   @override
@@ -22,14 +24,19 @@ class _ManageCoursesScreenState extends State<ManageCoursesScreen> {
   final _formKey = GlobalKey<FormState>();
   final _courseController = TextEditingController();
   final _professorController = TextEditingController();
-  final _roomController = TextEditingController();
   final _timeController = TextEditingController();
   List<Map<String, dynamic>> _courses = [];
   List<Map<String, dynamic>> _professors = [];
   List<Map<String, dynamic>> _rooms = [];
   bool _isLoading = false;
   String? _selectedProfessorId;
-  String? _selectedRoomId;
+  String? _selectedPromotion;
+  String? _selectedFiliere;
+  final List<String> _promotions = ['L1', 'L2', 'L3', 'L4'];
+  final List<String> _filieres = ['GL', 'MSI', 'DSG', 'TLC', 'AS'];
+  List<String> _selectedFilieres = [];
+  int? _selectedCredits;
+  final List<int> _creditsList = List.generate(7, (i) => i + 1);
 
   // Ajout du champ de recherche
   final TextEditingController _searchController = TextEditingController();
@@ -44,7 +51,6 @@ class _ManageCoursesScreenState extends State<ManageCoursesScreen> {
   void dispose() {
     _courseController.dispose();
     _professorController.dispose();
-    _roomController.dispose();
     _timeController.dispose();
     _searchController.dispose();
     super.dispose();
@@ -53,15 +59,15 @@ class _ManageCoursesScreenState extends State<ManageCoursesScreen> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      // Charger les cours
-      final coursesData = await DataService.getCourses();
-      
+      // Charger les cours filtrés par promotion et filière
+      final coursesData = await DataService.getCourses(
+        promotion: widget.level,
+        filiere: widget.filiere,
+      );
       // Charger les professeurs
       final professorsData = await DataService.getProfessors();
-
       // Charger les salles
       final roomsData = await DataService.getRooms();
-
       setState(() {
         _courses = coursesData;
         _professors = professorsData;
@@ -78,25 +84,52 @@ class _ManageCoursesScreenState extends State<ManageCoursesScreen> {
 
   Future<void> _addCourse() async {
     if (!_formKey.currentState!.validate()) return;
-
+    if (_selectedPromotion == null || _selectedPromotion!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Veuillez sélectionner une promotion.')),
+      );
+      return;
+    }
+    if (_selectedCredits == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Veuillez sélectionner le nombre de crédits.')),
+      );
+      return;
+    }
+    if ((_selectedPromotion == 'L3' || _selectedPromotion == 'L4') && _selectedFilieres.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Veuillez sélectionner au moins une filière.')),
+      );
+      return;
+    }
     setState(() => _isLoading = true);
     try {
-      await DataService.addCourse(
-        name: _courseController.text.trim(),
-        time: _timeController.text.trim(),
-        professorId: _selectedProfessorId,
-        roomId: _selectedRoomId,
-      );
-
-      // Réinitialiser le formulaire
+      int volumeHoraire = _selectedCredits! * 15;
+      if (_selectedPromotion == 'L3' || _selectedPromotion == 'L4') {
+        for (final filiere in _selectedFilieres) {
+          await DataService.addCourse(
+            name: _courseController.text.trim(),
+            volumeHoraire: volumeHoraire,
+            professorId: _selectedProfessorId,
+            promotion: _selectedPromotion!,
+            filiere: filiere,
+          );
+        }
+      } else {
+        await DataService.addCourse(
+          name: _courseController.text.trim(),
+          volumeHoraire: volumeHoraire,
+          professorId: _selectedProfessorId,
+          promotion: _selectedPromotion!,
+          filiere: null,
+        );
+      }
       _courseController.clear();
-      _timeController.clear();
       _selectedProfessorId = null;
-      _selectedRoomId = null;
-
-      // Recharger les données
+      _selectedPromotion = null;
+      _selectedFilieres = [];
+      _selectedCredits = null;
       await _loadData();
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Cours ajouté avec succès')),
@@ -169,6 +202,183 @@ class _ManageCoursesScreenState extends State<ManageCoursesScreen> {
       final prof = (course['professeur']?['profiles']?['nom_complet'] ?? '').toString().toLowerCase();
       return search.isEmpty || nom.contains(search) || prof.contains(search);
     }).toList();
+    if (widget.modal) {
+      // Mode modal : juste le formulaire d'ajout
+      return SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Ajouter un cours',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: AppColor.primary,
+                    fontFamily: 'poppins',
+                  ),
+                ),
+                const SizedBox(height: 24),
+                TextFormField(
+                  controller: _courseController,
+                  decoration: InputDecoration(
+                    labelText: 'Nom du cours',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    prefixIcon: const Icon(Icons.book),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Veuillez entrer le nom du cours';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: _selectedProfessorId,
+                  decoration: InputDecoration(
+                    labelText: 'Professeur',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    prefixIcon: const Icon(Icons.person),
+                  ),
+                  items: [
+                    const DropdownMenuItem<String>(
+                      value: null,
+                      child: Text('Sélectionner un professeur'),
+                    ),
+                    ..._professors.map((professor) {
+                      return DropdownMenuItem<String>(
+                        value: professor['id'],
+                        child: Text(professor['nom_complet']),
+                      );
+                    }).toList(),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedProfessorId = value;
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: _selectedPromotion,
+                  decoration: InputDecoration(
+                    labelText: 'Promotion',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    prefixIcon: const Icon(Icons.school),
+                  ),
+                  items: [
+                    const DropdownMenuItem<String>(
+                      value: null,
+                      child: Text('Sélectionner une promotion'),
+                    ),
+                    ..._promotions.map((promo) => DropdownMenuItem<String>(
+                      value: promo,
+                      child: Text(promo),
+                    )),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedPromotion = value;
+                      // Reset filière si on change de promotion
+                      if (_selectedPromotion != 'L3' && _selectedPromotion != 'L4') {
+                        _selectedFilieres = [];
+                      }
+                    });
+                  },
+                ),
+                // Champ filière seulement pour L3 et L4 (multi-sélection)
+                if (_selectedPromotion == 'L3' || _selectedPromotion == 'L4') ...[
+                  const SizedBox(height: 16),
+                  Text('Filières', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ..._filieres.map((filiere) => CheckboxListTile(
+                    value: _selectedFilieres.contains(filiere),
+                    title: Text(filiere),
+                    onChanged: (checked) {
+                      setState(() {
+                        if (checked == true) {
+                          _selectedFilieres.add(filiere);
+                        } else {
+                          _selectedFilieres.remove(filiere);
+                        }
+                      });
+                    },
+                  )),
+                ],
+                const SizedBox(height: 16),
+                DropdownButtonFormField<int>(
+                  value: _selectedCredits,
+                  decoration: InputDecoration(
+                    labelText: 'Nombre de crédits',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    prefixIcon: const Icon(Icons.timelapse),
+                  ),
+                  items: _creditsList.map((credit) => DropdownMenuItem<int>(
+                    value: credit,
+                    child: Text('$credit crédit${credit > 1 ? 's' : ''} (${credit * 15}h)'),
+                  )).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedCredits = value;
+                    });
+                  },
+                  validator: (value) {
+                    if (value == null) {
+                      return 'Veuillez sélectionner le nombre de crédits';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _addCourse,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColor.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Text(
+                            'Ajouter le cours',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'poppins',
+                            ),
+                          ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    // Mode normal : uniquement la liste des cours
     return Scaffold(
       appBar: AppBar(
         title: const Text('Gérer les Cours'),
@@ -192,156 +402,6 @@ class _ManageCoursesScreenState extends State<ManageCoursesScreen> {
                     onChanged: (value) {
                       setState(() {});
                     },
-                  ),
-                ),
-                Card(
-                  elevation: 4,
-                  shadowColor: AppColor.primary.withOpacity(0.2),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Ajouter un cours',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: AppColor.primary,
-                              fontFamily: 'poppins',
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          TextFormField(
-                            controller: _courseController,
-                            decoration: InputDecoration(
-                              labelText: 'Nom du cours',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              prefixIcon: const Icon(Icons.book),
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Veuillez entrer le nom du cours';
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 16),
-                          DropdownButtonFormField<String>(
-                            value: _selectedProfessorId,
-                            decoration: InputDecoration(
-                              labelText: 'Professeur',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              prefixIcon: const Icon(Icons.person),
-                            ),
-                            items: [
-                              const DropdownMenuItem<String>(
-                                value: null,
-                                child: Text('Sélectionner un professeur'),
-                              ),
-                              ..._professors.map((professor) {
-                                return DropdownMenuItem<String>(
-                                  value: professor['id'],
-                                  child: Text(professor['nom_complet']),
-                                );
-                              }).toList(),
-                            ],
-                            onChanged: (value) {
-                              setState(() {
-                                _selectedProfessorId = value;
-                              });
-                            },
-                          ),
-                          const SizedBox(height: 16),
-                          DropdownButtonFormField<String>(
-                            value: _selectedRoomId,
-                            decoration: InputDecoration(
-                              labelText: 'Salle',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              prefixIcon: const Icon(Icons.class_),
-                            ),
-                            items: [
-                              const DropdownMenuItem<String>(
-                                value: null,
-                                child: Text('Sélectionner une salle'),
-                              ),
-                              ..._rooms.map((room) {
-                                return DropdownMenuItem<String>(
-                                  value: room['id'],
-                                  child: Text(room['nom']),
-                                );
-                              }).toList(),
-                            ],
-                            onChanged: (value) {
-                              setState(() {
-                                _selectedRoomId = value;
-                              });
-                            },
-                          ),
-                          const SizedBox(height: 16),
-                          TextFormField(
-                            controller: _timeController,
-                            decoration: InputDecoration(
-                              labelText: 'Horaire',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              prefixIcon: const Icon(Icons.access_time),
-                              hintText: 'ex: 08:00',
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Veuillez entrer l\'horaire';
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 24),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: _isLoading ? null : _addCourse,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColor.primary,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: _isLoading
-                                  ? const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                      ),
-                                    )
-                                  : const Text(
-                                      'Ajouter le cours',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        fontFamily: 'poppins',
-                                      ),
-                                    ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -377,9 +437,6 @@ class _ManageCoursesScreenState extends State<ManageCoursesScreen> {
                                       children: [
                                         if (course['professeur'] != null)
                                           Text('Professeur: ${course['professeur']['profiles']['nom_complet']}'),
-                                        if (course['salle'] != null)
-                                          Text('Salle: ${course['salle']['nom']}'),
-                                        Text('Horaire: ${course['horaire'] ?? 'Non défini'}'),
                                       ],
                                     ),
                                     trailing: Row(

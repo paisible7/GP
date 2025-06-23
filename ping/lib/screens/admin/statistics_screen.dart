@@ -27,26 +27,32 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     }
     setState(() => _isLoading = true);
     try {
+      print('[DEBUG] Chargement des stats pour promotion=$_selectedPromotion, filiere=$_selectedFiliere');
       final rawData = await DataService.getAttendanceStats(
         promotion: _selectedPromotion!,
         filiere: _selectedFiliere,
       );
+      print('[DEBUG] Données brutes reçues :');
+      print(rawData);
 
       // Grouper les données par cours
       final Map<String, CourseStatistic> courseStatsMap = {};
       for (var row in rawData) {
+        print('[DEBUG] Traitement de la ligne :');
+        print(row);
         final courseId = row['cours_id'];
         final courseName = row['cours_nom'];
-        final totalSessions = (row['total_sessions'] as int?) ?? 0;
-
-        if (totalSessions == 0) continue;
+        final volumeHoraire = (row['volume_horaire'] as int?) ?? 0;
 
         final studentStat = StudentStatistic(
           studentId: row['etudiant_id'],
           studentName: row['etudiant_nom'],
-          presences: (row['presences_count'] as int?) ?? 0,
-          totalSessions: totalSessions,
+          heuresPresences: (row['heures_presences'] as num?)?.toDouble() ?? 0.0,
+          tauxPresence: (row['taux_presence'] as num?)?.toDouble() ?? 0.0,
+          tauxAbsence: (row['taux_absence'] as num?)?.toDouble() ?? 0.0,
+          alerte25: row['alerte_25'] == true,
         );
+        print('[DEBUG] StudentStat créé : $studentStat');
 
         if (courseStatsMap.containsKey(courseId)) {
           courseStatsMap[courseId]!.studentStats.add(studentStat);
@@ -54,7 +60,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
           courseStatsMap[courseId] = CourseStatistic(
             courseId: courseId,
             courseName: courseName,
-            totalSessions: totalSessions,
+            volumeHoraire: volumeHoraire,
             studentStats: [studentStat],
           );
         }
@@ -62,7 +68,11 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       setState(() {
         _stats = courseStatsMap.values.toList();
       });
-    } catch (e) {
+      print('[DEBUG] Statistiques finales prêtes à afficher :');
+      print(_stats);
+    } catch (e, stack) {
+      print('[ERREUR] lors du chargement des stats : $e');
+      print(stack);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Erreur lors du chargement des stats: $e')),
       );
@@ -174,7 +184,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
 
   Widget _buildCourseStatCard(CourseStatistic courseStat) {
     double averageAbsenceRate = courseStat.studentStats.isNotEmpty
-        ? courseStat.studentStats.map((s) => s.absenceRate).reduce((a, b) => a + b) / courseStat.studentStats.length
+        ? courseStat.studentStats.map((s) => s.tauxAbsence).reduce((a, b) => a + b) / courseStat.studentStats.length
         : 0;
 
     return Card(
@@ -189,7 +199,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
           title: Text(courseStat.courseName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppColor.primary)),
           subtitle: Padding(
             padding: const EdgeInsets.only(top: 5.0),
-            child: Text('${courseStat.studentStats.length} étudiant(s) • Moyenne d\'absence: ${averageAbsenceRate.toStringAsFixed(1)}%'),
+            child: Text('${courseStat.studentStats.length} étudiant(s) • Moyenne d\'absence: ${averageAbsenceRate.toStringAsFixed(1)}% • Volume horaire: ${courseStat.volumeHoraire}h'),
           ),
           children: [
             Container(
@@ -209,12 +219,11 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   }
 
   Widget _buildStudentStatCard(StudentStatistic stat) {
-    final absenceRate = stat.absenceRate;
-    final hasHighAbsence = absenceRate > 25.0;
+    final hasHighAbsence = stat.alerte25;
     final color = hasHighAbsence ? Colors.orange.shade800 : AppColor.primary;
 
     return SizedBox(
-      width: 160,
+      width: 180,
       child: Card(
         elevation: 1,
         shadowColor: Colors.black.withOpacity(0.1),
@@ -230,12 +239,12 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                   fit: StackFit.expand,
                   children: [
                     CircularProgressIndicator(
-                      value: absenceRate / 100,
+                      value: stat.tauxAbsence / 100,
                       strokeWidth: 6,
                       backgroundColor: color.withOpacity(0.2),
                       valueColor: AlwaysStoppedAnimation<Color>(color),
                     ),
-                    Center(child: Text('${absenceRate.toStringAsFixed(0)}%', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: color))),
+                    Center(child: Text('${stat.tauxAbsence.toStringAsFixed(0)}%', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: color))),
                   ],
                 ),
               ),
@@ -248,27 +257,18 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
               const SizedBox(height: 6),
               const Divider(height: 1),
               const SizedBox(height: 6),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildStatChip('Prés.', stat.presences.toString(), Colors.green.shade700),
-                  _buildStatChip('Abs.', stat.absences.toString(), Colors.red.shade700),
-                ],
-              ),
+              Text('Présence : ${stat.heuresPresences.toStringAsFixed(1)}h', style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.bold)),
+              Text('Taux présence : ${stat.tauxPresence.toStringAsFixed(1)}%', style: TextStyle(color: Colors.green.shade700)),
+              Text('Taux absence : ${stat.tauxAbsence.toStringAsFixed(1)}%', style: TextStyle(color: color)),
+              if (stat.alerte25)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6.0),
+                  child: Text('⚠️ Plus de 25% d\'absences', style: TextStyle(color: Colors.orange.shade800, fontWeight: FontWeight.bold)),
+                ),
             ],
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildStatChip(String label, String value, Color color) {
-    return Column(
-      children: [
-        Text(value, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 15)),
-        const SizedBox(height: 2),
-        Text(label, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
-      ],
     );
   }
 }

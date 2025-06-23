@@ -150,22 +150,17 @@ class _AdminSidebarState extends State<AdminSidebar> with SingleTickerProviderSt
                         title: 'Salles',
                         index: 3,
                       ),
-                      _buildExpansionTile(
+                      _buildMenuItem(
                         context,
                         icon: Icons.book,
                         title: 'Cours',
-                        children: [
-                          _buildSubMenuItem(context, 'L1', 4),
-                          _buildSubMenuItem(context, 'L2', 5),
-                          _buildSubMenuItem(context, 'L3', 6),
-                          _buildSubMenuItem(context, 'L4', 7),
-                        ],
+                        index: 4,
                       ),
                       _buildMenuItem(
                         context,
                         icon: Icons.bar_chart,
                         title: 'Statistiques',
-                        index: 8,
+                        index: 5,
                       ),
                       const Divider(
                         height: 32,
@@ -176,13 +171,13 @@ class _AdminSidebarState extends State<AdminSidebar> with SingleTickerProviderSt
                         context,
                         icon: Icons.settings,
                         title: 'Paramètres',
-                        index: 9,
+                        index: 6,
                       ),
                       _buildMenuItem(
                         context,
                         icon: Icons.logout,
                         title: 'Déconnexion',
-                        index: 10,
+                        index: 7,
                         isLogout: true,
                       ),
                     ],
@@ -256,90 +251,6 @@ class _AdminSidebarState extends State<AdminSidebar> with SingleTickerProviderSt
                     ),
                   ),
                 ],
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildExpansionTile(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required List<Widget> children,
-  }) {
-    return Theme(
-      data: Theme.of(context).copyWith(
-        dividerColor: Colors.transparent,
-      ),
-      child: ExpansionTile(
-        leading: Icon(icon, color: Colors.white.withOpacity(0.7)),
-        title: widget.isCollapsed
-            ? const SizedBox.shrink()
-            : Text(
-                title,
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  fontFamily: 'poppins',
-                  letterSpacing: 0.3,
-                ),
-              ),
-        iconColor: Colors.white.withOpacity(0.7),
-        collapsedIconColor: Colors.white.withOpacity(0.7),
-        backgroundColor: Colors.transparent,
-        collapsedBackgroundColor: Colors.transparent,
-        childrenPadding: const EdgeInsets.only(left: 16),
-        children: children,
-      ),
-    );
-  }
-
-  Widget _buildSubMenuItem(BuildContext context, String title, int index) {
-    final isSelected = widget.selectedIndex == index;
-    final color = isSelected ? Colors.white : Colors.white.withOpacity(0.7);
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        color: isSelected ? Colors.white.withOpacity(0.1) : Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
-        border: isSelected
-            ? Border.all(color: Colors.white.withOpacity(0.2), width: 1)
-            : null,
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => widget.onItemSelected(index),
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            child: Row(
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: color,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 14,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                    fontFamily: 'poppins',
-                    letterSpacing: 0.3,
-                  ),
-                ),
               ],
             ),
           ),

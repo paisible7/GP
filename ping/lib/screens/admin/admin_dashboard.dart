@@ -19,6 +19,8 @@ class AdminDashboard extends StatefulWidget {
 
 class _AdminDashboardState extends State<AdminDashboard> {
   int _selectedIndex = 0;
+  String? _selectedPromotion;
+  String? _selectedFiliere;
   bool _isSidebarCollapsed = false;
   Map<String, int> _stats = {};
   bool _isLoading = true;
@@ -49,6 +51,39 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Widget _getScreen() {
+    if (_selectedIndex == 4) {
+      // Onglet Cours
+      if (_selectedPromotion == null) {
+        // Afficher la grille des promotions
+        return _buildPromotionsGrid();
+      } else if ((_selectedPromotion == 'L3' || _selectedPromotion == 'L4') && _selectedFiliere == null) {
+        // Afficher la grille des filières
+        return _buildFilieresGrid(_selectedPromotion!);
+      } else {
+        // Afficher les cours de la promotion/filière
+        return Stack(
+          children: [
+            ManageCoursesScreen(
+              level: _selectedPromotion!,
+              filiere: _selectedFiliere,
+            ),
+            Positioned(
+              bottom: 32,
+              right: 32,
+              child: FloatingActionButton(
+                backgroundColor: AppColor.primary,
+                foregroundColor: Colors.white,
+                onPressed: () {
+                  _showAddCourseModal(context);
+                },
+                child: const Icon(Icons.add),
+              ),
+            ),
+          ],
+        );
+      }
+    }
+    // Autres onglets
     switch (_selectedIndex) {
       case 0:
         return _buildDashboard();
@@ -58,17 +93,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
         return const ManageStudentsScreen();
       case 3:
         return const ManageRoomsScreen();
-      case 4:
-        return _buildCoursesScreen('L1');
       case 5:
-        return _buildCoursesScreen('L2');
-      case 6:
-        return _buildCoursesScreen('L3');
-      case 7:
-        return _buildCoursesScreen('L4');
-      case 8:
         return const StatisticsScreen();
-      case 9:
+      case 6:
         return _buildSettingsPlaceholder();
       default:
         return _buildDashboard();
@@ -102,109 +129,100 @@ class _AdminDashboardState extends State<AdminDashboard> {
     }
   }
 
-  Widget _buildCoursesScreen(String level) {
-    List<String> filieres = [];
-    if (level == 'L3' || level == 'L4') {
-      filieres = ['GL', 'MSI', 'DSG', 'TLC', 'AS'];
-    }
-
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Gestion des Cours - $level',
-            style: const TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              fontFamily: 'poppins',
+  Widget _buildPromotionsGrid() {
+    final promotions = ['L1', 'L2', 'L3', 'L4'];
+    return Center(
+      child: Wrap(
+        spacing: 32,
+        runSpacing: 32,
+        children: promotions.map((promo) => GestureDetector(
+          onTap: () {
+            setState(() {
+              _selectedPromotion = promo;
+            });
+          },
+          child: Card(
+            elevation: 4,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: Container(
+              width: 180,
+              height: 120,
+              alignment: Alignment.center,
+              child: Text(
+                promo,
+                style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColor.primary),
+              ),
             ),
           ),
-          const SizedBox(height: 24),
-          if (filieres.isNotEmpty) ...[
-            Wrap(
-              spacing: 16,
-              runSpacing: 16,
-              children: filieres.map((filiere) {
-                return _buildFiliereCard(level, filiere);
-              }).toList(),
-            ),
-          ] else ...[
-            Expanded(
-              child: ManageCoursesScreen(level: level),
-            ),
-          ],
-        ],
+        )).toList(),
       ),
     );
   }
 
-  Widget _buildFiliereCard(String level, String filiere) {
-    return Card(
-      elevation: 4,
-      shadowColor: AppColor.primary.withOpacity(0.2),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: InkWell(
-        onTap: () {
-          // TODO: Naviguer vers la gestion des cours de la filière
-        },
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          width: 200,
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                AppColor.primary.withOpacity(0.1),
-                AppColor.primary.withOpacity(0.05),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+  Widget _buildFilieresGrid(String promotion) {
+    final filieres = ['GL', 'MSI', 'DSG', 'TLC', 'AS'];
+    return Center(
+      child: Wrap(
+        spacing: 32,
+        runSpacing: 32,
+        children: filieres.map((filiere) => GestureDetector(
+          onTap: () {
+            setState(() {
+              _selectedFiliere = filiere;
+            });
+          },
+          child: Card(
+            elevation: 4,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: Container(
+              width: 180,
+              height: 120,
+              alignment: Alignment.center,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    filiere,
+                    style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppColor.primary),
+                  ),
+                  const SizedBox(height: 8),
+                  Text('$promotion - $filiere', style: const TextStyle(fontSize: 14, color: Colors.grey)),
+                ],
+              ),
             ),
-            borderRadius: BorderRadius.circular(16),
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColor.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  Icons.school,
-                  color: AppColor.primary,
-                  size: 32,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                filiere,
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: AppColor.primary,
-                  fontFamily: 'poppins',
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '$level - $filiere',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                  fontFamily: 'poppins',
-                ),
-              ),
-            ],
-          ),
-        ),
+        )).toList(),
       ),
     );
+  }
+
+  void _showAddCourseModal(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: SizedBox(
+            width: 500,
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: ManageCoursesScreen(
+                level: _selectedPromotion!,
+                filiere: _selectedFiliere,
+                modal: true,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _resetCoursNavigation() {
+    setState(() {
+      _selectedPromotion = null;
+      _selectedFiliere = null;
+    });
   }
 
   Widget _buildDashboard() {
@@ -453,16 +471,21 @@ class _AdminDashboardState extends State<AdminDashboard> {
               ),
             ],
           ),
-          drawer: Padding(padding: const EdgeInsets.only(top: 50), // Ajuster la position du tiroir
-          child : Drawer(
-            child: AdminSidebar(
-              selectedIndex: _selectedIndex,
-              onItemSelected: (index) {
-                setState(() => _selectedIndex = index);
-                Navigator.pop(context);
-              },
+          drawer: Padding(
+            padding: const EdgeInsets.only(top: 50),
+            child: Drawer(
+              child: AdminSidebar(
+                selectedIndex: _selectedIndex,
+                onItemSelected: (index) {
+                  setState(() {
+                    _selectedIndex = index;
+                    if (index == 4) _resetCoursNavigation();
+                  });
+                  Navigator.pop(context);
+                },
+              ),
             ),
-          )),
+          ),
           body: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -484,7 +507,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 AdminSidebar(
                   selectedIndex: _selectedIndex,
                   onItemSelected: (index) {
-                    setState(() => _selectedIndex = index);
+                    setState(() {
+                      _selectedIndex = index;
+                      if (index == 4) _resetCoursNavigation();
+                    });
                   },
                   isCollapsed: _isSidebarCollapsed,
                 ),

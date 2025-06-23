@@ -32,13 +32,14 @@ class DataService {
           .select('id');
       final roomsCount = roomsData.length;
 
-      // Compter les sessions actives aujourd'hui
+      // Compter les sessions actives aujourd'hui (en utilisant la date de l'horaire)
       final today = DateTime.now();
+      final todayStr = today.toIso8601String().split('T')[0];
       final sessionsData = await _supabase
           .from('sessions_presence')
-          .select('id')
+          .select('id, horaire:horaire_id(date)')
           .eq('est_active', true)
-          .gte('date', today.toIso8601String().split('T')[0]);
+          .gte('horaire.date', todayStr);
       final sessionsCount = sessionsData.length;
 
       // Calculer le taux de présence global
@@ -294,14 +295,40 @@ class DataService {
   }
 
   // Méthodes pour les cours
-  static Future<List<Map<String, dynamic>>> getCourses() async {
+  static Future<List<Map<String, dynamic>>> getCourses({
+    required String promotion,
+    String? filiere,
+  }) async {
     try {
-      final data = await _supabase
-          .from('cours')
-          .select('*, professeur:professeurs(id, profiles(nom_complet)), salle:salles_de_cours(nom)')
-          .order('nom');
-      
-      return List<Map<String, dynamic>>.from(data);
+      List data = [];
+      if (filiere != null) {
+        // Récupérer les cours de la filière
+        final dataFiliere = await _supabase
+          .from('cours_groupes')
+          .select('cours_id, cours: cours_id(*, professeur:professeurs(id, profiles(nom_complet)))')
+          .eq('promotion', promotion)
+          .eq('filiere', filiere);
+        // Récupérer les cours d'ensemble (filiere null)
+        final dataEnsemble = await _supabase
+          .from('cours_groupes')
+          .select('cours_id, cours: cours_id(*, professeur:professeurs(id, profiles(nom_complet)))')
+          .eq('promotion', promotion)
+          .filter('filiere', 'is', null);
+        // Fusionner sans doublons
+        final ids = <dynamic>{};
+        data = [...dataFiliere, ...dataEnsemble].where((item) {
+          if (ids.contains(item['cours_id'])) return false;
+          ids.add(item['cours_id']);
+          return true;
+        }).toList();
+      } else {
+        data = await _supabase
+          .from('cours_groupes')
+          .select('cours_id, cours: cours_id(*, professeur:professeurs(id, profiles(nom_complet)))')
+          .eq('promotion', promotion);
+      }
+      final coursList = data.map<Map<String, dynamic>>((item) => item['cours'] as Map<String, dynamic>).toList();
+      return coursList;
     } catch (e) {
       throw Exception('Erreur lors du chargement des cours: $e');
     }
@@ -309,16 +336,24 @@ class DataService {
 
   static Future<void> addCourse({
     required String name,
-    required String time,
+    required int volumeHoraire,
     required String? professorId,
-    required String? roomId,
+    required String promotion,
+    String? filiere,
   }) async {
     try {
-      await _supabase.from('cours').insert({
+      final response = await _supabase.from('cours').insert({
         'nom': name,
-        'horaire': time,
+        'volume_horaire': volumeHoraire,
         'professeur_id': professorId,
-        'salle_id': roomId,
+      }).select().single();
+
+      final coursId = response['id'];
+
+      await _supabase.from('cours_groupes').insert({
+        'cours_id': coursId,
+        'promotion': promotion,
+        'filiere': filiere,
       });
     } catch (e) {
       throw Exception('Erreur lors de l\'ajout du cours: $e');
@@ -341,6 +376,7 @@ class DataService {
     String? filiere,
   }) async {
     try {
+      print('[DEBUG] Appel RPC get_attendance_stats_for_promo avec promotion=$promotion, filiere=$filiere');
       final response = await _supabase.rpc(
         'get_attendance_stats_for_promo',
         params: {
@@ -348,9 +384,16 @@ class DataService {
           'filiere_filter': filiere,
         },
       );
-      return (response as List).cast<Map<String, dynamic>>();
-    } catch (e) {
-      print('Error fetching attendance stats: $e');
+      print('[DEBUG] Réponse brute Supabase :');
+      print(response);
+      print('[DEBUG] Type de la réponse : ' + response.runtimeType.toString());
+      final result = (response as List).cast<Map<String, dynamic>>();
+      print('[DEBUG] Résultat casté :');
+      print(result);
+      return result;
+    } catch (e, stack) {
+      print('[ERREUR] lors du fetch des stats de présence : $e');
+      print(stack);
       throw Exception('Failed to load statistics.');
     }
   }
@@ -450,17 +493,22 @@ class DataService {
     required int dureeMinutes,
   }) async {
     try {
-      await _supabase.from('sessions_presence').insert({
+      print('[DEBUG] Tentative de création d\'horaire planifié avec :');
+      print('  coursId: ' + coursId);
+      print('  professeurId: ' + (professeurId ?? 'null'));
+      print('  salleId: ' + salleId);
+      print('  date: ' + date.toIso8601String());
+      print('  dureeMinutes: ' + dureeMinutes.toString());
+      await _supabase.from('horaires').insert({
         'cours_id': coursId,
         'professeur_id': professeurId,
         'salle_id': salleId,
         'date': date.toIso8601String(),
         'duree_minutes': dureeMinutes,
-        'est_active': false,
-        'qr_code': null,
       });
     } catch (e) {
-      throw Exception('Erreur lors de la création de la séance planifiée: $e');
+      print('[ERREUR] lors de la création de l\'horaire planifié: ' + e.toString());
+      throw Exception('Erreur lors de la création de l\'horaire planifié: ' + e.toString());
     }
   }
 
@@ -540,6 +588,23 @@ class DataService {
       });
     } catch (e) {
       throw Exception('Erreur lors de la création de la session avec QR code: $e');
+    }
+  }
+
+  static Future<void> createSessionPresence({
+    required String horaireId,
+    required String qrCode,
+  }) async {
+    try {
+      print('[DEBUG] Création d\'une session activée pour l\'horaire $horaireId avec QR: $qrCode');
+      await _supabase.from('sessions_presence').insert({
+        'horaire_id': horaireId,
+        'qr_code': qrCode,
+        'est_active': true,
+      });
+    } catch (e) {
+      print('[ERREUR] lors de la création de la session activée: ' + e.toString());
+      throw Exception('Erreur lors de la création de la session activée: ' + e.toString());
     }
   }
 
