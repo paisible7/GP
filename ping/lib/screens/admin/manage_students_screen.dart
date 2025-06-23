@@ -73,7 +73,9 @@ class _ManageStudentsScreenState extends State<ManageStudentsScreen> {
         name: _nameController.text.trim(),
         password: _passwordController.text,
         promotion: _promotionController.text.trim(),
-        filiere: _filiereController.text.trim(),
+        filiere: (_promotionController.text.trim() == 'L3' || _promotionController.text.trim() == 'L4')
+            ? _filiereController.text.trim()
+            : null,
       );
 
       // Réinitialiser le formulaire
@@ -155,87 +157,126 @@ class _ManageStudentsScreenState extends State<ManageStudentsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Ajouter un étudiant'),
-        content: SingleChildScrollView(
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: _emailController,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    hintText: 'exemple@esisalama.org',
+        content: StatefulBuilder(
+          builder: (context, setStateDialog) => SingleChildScrollView(
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: _emailController,
+                    decoration: const InputDecoration(
+                      labelText: 'Email',
+                      hintText: 'exemple@esisalama.org',
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Veuillez entrer un email';
+                      }
+                      if (!value.endsWith('@esisalama.org')) {
+                        return 'Veuillez utiliser un email ESIS';
+                      }
+                      return null;
+                    },
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Veuillez entrer un email';
-                    }
-                    if (!value.endsWith('@esisalama.org')) {
-                      return 'Veuillez utiliser un email ESIS';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Nom complet',
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _nameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Nom complet',
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Veuillez entrer un nom';
+                      }
+                      return null;
+                    },
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Veuillez entrer un nom';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _promotionController,
-                  decoration: const InputDecoration(
-                    labelText: 'Promotion',
-                    hintText: 'ex: L1, L2, L3, L4',
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    value: _promotionController.text.isNotEmpty ? _promotionController.text : null,
+                    decoration: const InputDecoration(
+                      labelText: 'Promotion',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: _promotions
+                        .map((promo) => DropdownMenuItem<String>(
+                              value: promo,
+                              child: Text(promo),
+                            ))
+                        .toList(),
+                    onChanged: (value) {
+                      setStateDialog(() {
+                        _promotionController.text = value ?? '';
+                        if (_promotionController.text != 'L3' && _promotionController.text != 'L4') {
+                          _filiereController.text = '';
+                        }
+                      });
+                    },
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Veuillez sélectionner une promotion';
+                      }
+                      return null;
+                    },
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Veuillez entrer une promotion';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _filiereController,
-                  decoration: const InputDecoration(
-                    labelText: 'Filière',
-                    hintText: 'ex: GL, MSI, DSG, TLC, AS',
+                  const SizedBox(height: 16),
+                  AbsorbPointer(
+                    absorbing: !(_promotionController.text == 'L3' || _promotionController.text == 'L4'),
+                    child: DropdownButtonFormField<String>(
+                      value: _filiereController.text.isNotEmpty ? _filiereController.text : null,
+                      decoration: InputDecoration(
+                        labelText: 'Filière',
+                        border: OutlineInputBorder(),
+                        fillColor: !(_promotionController.text == 'L3' || _promotionController.text == 'L4')
+                            ? Colors.grey.shade200
+                            : null,
+                        filled: true,
+                      ),
+                      items: _filieres
+                          .map((filiere) => DropdownMenuItem<String>(
+                                value: filiere,
+                                child: Text(filiere),
+                              ))
+                          .toList(),
+                      onChanged: (_promotionController.text == 'L3' || _promotionController.text == 'L4')
+                          ? (value) {
+                              setStateDialog(() {
+                                _filiereController.text = value ?? '';
+                              });
+                            }
+                          : null,
+                      validator: (value) {
+                        if (_promotionController.text == 'L3' || _promotionController.text == 'L4') {
+                          if (value == null || value.isEmpty) {
+                            return 'Veuillez sélectionner une filière';
+                          }
+                        }
+                        return null;
+                      },
+                      disabledHint: const Text('Sélectionnez d\'abord L3 ou L4'),
+                    ),
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Veuillez entrer une filière';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _passwordController,
-                  decoration: const InputDecoration(
-                    labelText: 'Mot de passe',
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _passwordController,
+                    decoration: const InputDecoration(
+                      labelText: 'Mot de passe',
+                    ),
+                    obscureText: true,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Veuillez entrer un mot de passe';
+                      }
+                      if (value.length < 6) {
+                        return 'Le mot de passe doit contenir au moins 6 caractères';
+                      }
+                      return null;
+                    },
                   ),
-                  obscureText: true,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Veuillez entrer un mot de passe';
-                    }
-                    if (value.length < 6) {
-                      return 'Le mot de passe doit contenir au moins 6 caractères';
-                    }
-                    return null;
-                  },
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

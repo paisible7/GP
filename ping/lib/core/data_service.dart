@@ -192,7 +192,7 @@ class DataService {
     required String name,
     required String password,
     required String promotion,
-    required String filiere,
+    String? filiere,
   }) async {
     try {
       // Créer l'utilisateur dans Supabase Auth
@@ -215,12 +215,17 @@ class DataService {
         'role': 'etudiant',
       });
 
-      // Ajouter l'étudiant dans la table etudiants
-      await _supabase.from('etudiants').insert({
+      // Préparer la map pour l'étudiant
+      final etudiantData = {
         'id': authResponse.user!.id,
         'promotion': promotion,
-        'filiere': filiere,
-      });
+      };
+      // Ajouter la filière seulement pour L3/L4
+      if ((promotion == 'L3' || promotion == 'L4') && filiere != null && filiere.isNotEmpty) {
+        etudiantData['filiere'] = filiere;
+      }
+
+      await _supabase.from('etudiants').insert(etudiantData);
     } catch (e) {
       throw Exception('Erreur lors de l\'ajout de l\'étudiant: $e');
     }
