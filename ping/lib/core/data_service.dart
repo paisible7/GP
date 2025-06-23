@@ -617,13 +617,26 @@ class DataService {
     try {
       final data = await _supabase
           .from('horaires')
-          .select('id, date, duree_minutes, cours: cours_id (nom), salle: salle_id (nom)')
+          .select('id, date, duree_minutes, cours_id, cours: cours_id (nom, volume_horaire), salle: salle_id (nom)')
           .eq('professeur_id', professorId)
           .gte('date', startOfWeek.toIso8601String())
           .lt('date', endOfWeek.toIso8601String());
       return List<Map<String, dynamic>>.from(data);
     } catch (e) {
       throw Exception('Erreur lors de la récupération des horaires: $e');
+    }
+  }
+
+  /// Récupère tous les horaires d'un professeur (toutes dates)
+  static Future<List<Map<String, dynamic>>> getAllProfessorHoraires(String professorId) async {
+    try {
+      final data = await _supabase
+          .from('horaires')
+          .select('id, date, duree_minutes, cours_id, cours: cours_id (nom, volume_horaire), salle: salle_id (nom)')
+          .eq('professeur_id', professorId);
+      return List<Map<String, dynamic>>.from(data);
+    } catch (e) {
+      throw Exception('Erreur lors de la récupération de tous les horaires: $e');
     }
   }
 
