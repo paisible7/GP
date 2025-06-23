@@ -16,7 +16,10 @@ class CalendrierScreen extends StatefulWidget {
 
 class _CalendrierScreenState extends State<CalendrierScreen> {
   late Future<List<Map<String, dynamic>>> _sessionsFuture;
+  late Future<List<Map<String, dynamic>>> _coursesFuture;
   Map<DateTime, List<Map<String, dynamic>>> _sessionsByDay = {};
+  Map<String, int> _courseTotalHours = {}; // cours_id -> volume horaire total
+  Map<String, double> _coursePlannedHours = {}; // cours_id -> heures déjà planifiées
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
 
@@ -25,68 +28,43 @@ class _CalendrierScreenState extends State<CalendrierScreen> {
     super.initState();
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     final now = DateTime.now();
-    final startOfWeek = now.subtract(Duration(days: now.weekday - 1)); // Lundi
-    final endOfWeek = startOfWeek.add(const Duration(days: 7)); // Lundi suivant
-    _sessionsFuture = DataService.getProfessorPlannedSessions(
+    final startOfWeek = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
+    final endOfWeek = startOfWeek.add(const Duration(days: 7)); // Lundi suivant 00:00:00
+    print('[CalendrierScreen] Chargement des horaires pour userId=${userProvider.userId}, semaine du $startOfWeek au $endOfWeek');
+    _sessionsFuture = DataService.getProfessorHorairesForWeek(
       userProvider.userId!,
       startOfWeek,
       endOfWeek,
     );
+    _coursesFuture = DataService.getProfessorCourses(userProvider.userId!);
     _selectedDay = now;
   }
 
   List<Map<String, dynamic>> _getSessionsForDay(DateTime day) {
     final key = DateTime(day.year, day.month, day.day);
-    return _sessionsByDay[key] ?? [];
+    final sessions = _sessionsByDay[key] ?? [];
+    print('[CalendrierScreen] Horaires pour le $key : ${sessions.length}');
+    return sessions;
   }
 
-  Future<void> _activateSession(String sessionId) async {
-    try {
-      final qrCode = await DataService.activatePlannedSession(sessionId);
-      if (mounted) {
-        _showQRCodeDialog(qrCode);
-        // Recharger les données
-        setState(() {
-          final userProvider = Provider.of<UserProvider>(context, listen: false);
-          final now = DateTime.now();
-          final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-          final endOfWeek = startOfWeek.add(const Duration(days: 7));
-          _sessionsFuture = DataService.getProfessorPlannedSessions(
-            userProvider.userId!,
-            startOfWeek,
-            endOfWeek,
-          );
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur lors de l\'activation: $e')),
-        );
+  void _computeCourseHours(List<Map<String, dynamic>> horaires, List<Map<String, dynamic>> courses) {
+    _courseTotalHours.clear();
+    _coursePlannedHours.clear();
+    for (var course in courses) {
+      final id = course['id']?.toString();
+      final volume = course['volume_horaire'] is int ? course['volume_horaire'] : int.tryParse(course['volume_horaire']?.toString() ?? '0') ?? 0;
+      if (id != null) {
+        _courseTotalHours[id] = volume;
+        _coursePlannedHours[id] = 0.0;
       }
     }
-  }
-
-  void _showQRCodeDialog(String qrCode) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('QR Code généré'),
-        content: SizedBox(
-          width: 250,
-          height: 250,
-          child: Center(
-            child: QrImageWidget(data: qrCode, size: 200),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Fermer'),
-          ),
-        ],
-      ),
-    );
+    for (var horaire in horaires) {
+      final coursId = horaire['cours_id']?.toString();
+      final duree = horaire['duree_minutes'] is int ? horaire['duree_minutes'] : int.tryParse(horaire['duree_minutes']?.toString() ?? '0') ?? 0;
+      if (coursId != null && _coursePlannedHours.containsKey(coursId)) {
+        _coursePlannedHours[coursId] = (_coursePlannedHours[coursId] ?? 0) + duree / 60.0;
+      }
+    }
   }
 
   @override
@@ -94,104 +72,147 @@ class _CalendrierScreenState extends State<CalendrierScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Calendrier de la semaine'),
+        backgroundColor: AppColor.primary,
+        foregroundColor: Colors.white,
       ),
       body: FutureBuilder<List<Map<String, dynamic>>>(
         future: _sessionsFuture,
         builder: (context, snapshot) {
+          print('[CalendrierScreen] FutureBuilder - état: [${snapshot.connectionState}]');
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
-            return Center(child: Text('Erreur : ${snapshot.error}'));
+            print('[CalendrierScreen] Erreur FutureBuilder : [${snapshot.error}]');
+            return Center(child: Text('Erreur : [${snapshot.error}]'));
           } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('Aucune séance prévue cette semaine.'));
+            print('[CalendrierScreen] Aucun horaire prévu cette semaine.');
+            return const Center(child: Text('Aucun horaire prévu cette semaine.'));
           }
 
-          final sessions = snapshot.data!;
-          // Grouper les séances par jour (clé = DateTime sans heure)
-          _sessionsByDay.clear();
-          for (var session in sessions) {
-            final date = DateTime.parse(session['date']);
-            final key = DateTime(date.year, date.month, date.day);
-            _sessionsByDay.putIfAbsent(key, () => []).add(session);
-          }
+          final horaires = snapshot.data!;
+          print('[CalendrierScreen] Nombre total d\'horaires récupérés : ${horaires.length}');
+          return FutureBuilder<List<Map<String, dynamic>>>(
+            future: _coursesFuture,
+            builder: (context, courseSnap) {
+              if (courseSnap.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              } else if (courseSnap.hasError) {
+                return Center(child: Text('Erreur chargement cours : ${courseSnap.error}'));
+              } else if (!courseSnap.hasData) {
+                return const Center(child: Text('Aucun cours trouvé.'));
+              }
+              final courses = courseSnap.data!;
+              _computeCourseHours(horaires, courses);
+              // Trier les horaires par date
+              horaires.sort((a, b) {
+                final dateA = DateTime.tryParse(a['date'] ?? '') ?? DateTime(1970);
+                final dateB = DateTime.tryParse(b['date'] ?? '') ?? DateTime(1970);
+                return dateA.compareTo(dateB);
+              });
+              // Grouper les horaires par jour (clé = DateTime sans heure)
+              _sessionsByDay.clear();
+              for (var horaire in horaires) {
+                try {
+                  final date = DateTime.parse(horaire['date'] ?? '');
+                  final key = DateTime(date.year, date.month, date.day);
+                  _sessionsByDay.putIfAbsent(key, () => []).add(horaire);
+                } catch (e) {
+                  print('[CalendrierScreen] Erreur lors du parsing de l\'horaire : $horaire\nErreur: $e');
+                }
+              }
 
-          return Column(
-            children: [
-              TableCalendar(
-                firstDay: DateTime.now().subtract(const Duration(days: 365)),
-                lastDay: DateTime.now().add(const Duration(days: 365)),
-                focusedDay: _focusedDay,
-                calendarFormat: CalendarFormat.week,
-                startingDayOfWeek: StartingDayOfWeek.monday,
-                selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-                onDaySelected: (selectedDay, focusedDay) {
-                  setState(() {
-                    _selectedDay = selectedDay;
-                    _focusedDay = focusedDay;
-                  });
-                },
-                eventLoader: (day) => _getSessionsForDay(day),
-                calendarStyle: const CalendarStyle(
-                  todayDecoration: BoxDecoration(
-                    color: AppColor.secondary,
-                    shape: BoxShape.circle,
-                  ),
-                  selectedDecoration: BoxDecoration(
-                    color: AppColor.secondary,
-                    shape: BoxShape.circle,
-                  ),
-                  markerDecoration: BoxDecoration(
-                    color: AppColor.primary,
-                    shape: BoxShape.circle,
-                  ),
-                  markersMaxCount: 2,
-                ),
-                headerStyle: const HeaderStyle(
-                  formatButtonVisible: false,
-                  titleCentered: true,
-                ),
-                locale: 'fr_FR',
-              ),
-              const SizedBox(height: 8),
-              Expanded(
-                child: _getSessionsForDay(_selectedDay ?? DateTime.now()).isEmpty
-                    ? const Center(child: Text('Aucune séance ce jour.'))
-                    : ListView(
-                        children: _getSessionsForDay(_selectedDay ?? DateTime.now()).map((session) {
-                          final isActive = session['est_active'] == true;
-                          final hasQRCode = session['qr_code'] != null;
-                          return Card(
-                            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            child: ListTile(
-                              title: Text(session['cours']['nom'] ?? 'Cours inconnu'),
-                              subtitle: Text(
-                                'Heure : ${DateFormat('HH:mm').format(DateTime.parse(session['date']))}\n'
-                                'Salle : ${session['cours']['salle']?['nom'] ?? 'N/A'}',
-                              ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    '${(session['duree_minutes'] / 60).toStringAsFixed(1)} h',
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  if (!isActive)
-                                    IconButton(
-                                      icon: const Icon(Icons.play_arrow, color: Colors.green),
-                                      tooltip: 'Démarrer la séance',
-                                      onPressed: () => _activateSession(session['id']),
-                                    )
-                                  else if (hasQRCode)
-                                    const Icon(Icons.check_circle, color: Colors.green),
-                                ],
-                              ),
-                            ),
-                          );
-                        }).toList(),
+              return Column(
+                children: [
+                  TableCalendar(
+                    firstDay: DateTime.now().subtract(const Duration(days: 365)),
+                    lastDay: DateTime.now().add(const Duration(days: 365)),
+                    focusedDay: _focusedDay,
+                    calendarFormat: CalendarFormat.week,
+                    startingDayOfWeek: StartingDayOfWeek.monday,
+                    selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+                    onDaySelected: (selectedDay, focusedDay) {
+                      setState(() {
+                        _selectedDay = selectedDay;
+                        _focusedDay = focusedDay;
+                        print('[CalendrierScreen] Jour sélectionné : $_selectedDay');
+                      });
+                    },
+                    eventLoader: (day) => _getSessionsForDay(day),
+                    calendarStyle: const CalendarStyle(
+                      todayDecoration: BoxDecoration(
+                        color: AppColor.secondary,
+                        shape: BoxShape.circle,
                       ),
-              ),
-            ],
+                      selectedDecoration: BoxDecoration(
+                        color: AppColor.secondary,
+                        shape: BoxShape.circle,
+                      ),
+                      markerDecoration: BoxDecoration(
+                        color: AppColor.primary,
+                        shape: BoxShape.circle,
+                      ),
+                      markersMaxCount: 2,
+                    ),
+                    headerStyle: const HeaderStyle(
+                      formatButtonVisible: false,
+                      titleCentered: true,
+                    ),
+                    locale: 'fr_FR',
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: _getSessionsForDay(_selectedDay ?? DateTime.now()).isEmpty
+                        ? const Center(child: Text('Aucun horaire ce jour.'))
+                        : ListView(
+                            children: _getSessionsForDay(_selectedDay ?? DateTime.now()).map((horaire) {
+                              final coursNom = horaire['cours']?['nom'] ?? 'Cours inconnu';
+                              final salleNom = horaire['salle']?['nom'] ?? 'N/A';
+                              final dateStr = horaire['date'] ?? '';
+                              DateTime? date;
+                              try {
+                                date = DateTime.parse(dateStr);
+                              } catch (e) {
+                                print('[CalendrierScreen] Erreur parsing date: $dateStr');
+                              }
+                              final heure = date != null ? DateFormat('HH:mm').format(date) : '--:--';
+                              final duree = horaire['duree_minutes'] != null ? (horaire['duree_minutes'] / 60).toStringAsFixed(1) : '?';
+                              final coursId = horaire['cours_id']?.toString();
+                              final total = coursId != null && _courseTotalHours.containsKey(coursId) ? _courseTotalHours[coursId] : null;
+                              final planifie = coursId != null && _coursePlannedHours.containsKey(coursId) ? _coursePlannedHours[coursId] : null;
+                              final restant = (total != null && planifie != null) ? (total - planifie).clamp(0, total) : null;
+                              print('[CalendrierScreen] Affichage horaire : $coursNom - Salle : $salleNom - Date : $dateStr');
+                              return Card(
+                                margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                child: ListTile(
+                                  leading: Icon(Icons.event, color: AppColor.primary),
+                                  title: Text(
+                                    coursNom,
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+                                  ),
+                                  subtitle: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('Heure : $heure', style: const TextStyle(fontSize: 16)),
+                                      Text('Salle : $salleNom', style: const TextStyle(fontSize: 16)),
+                                      Text('Durée : $duree h', style: const TextStyle(fontSize: 16)),
+                                      if (restant != null && total != null)
+                                        Padding(
+                                          padding: const EdgeInsets.only(top: 6.0),
+                                          child: Text(
+                                            'Volume horaire restant : ${restant.toStringAsFixed(1)} h / $total h',
+                                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                  ),
+                ],
+              );
+            },
           );
         },
       ),

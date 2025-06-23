@@ -539,11 +539,10 @@ class DataService {
     try {
       final data = await _supabase
           .from('sessions_presence')
-          .select('id, date, duree_minutes, qr_code, est_active, cours: cours_id (nom, salle: salle_id (nom)), professeur_id')
-          .eq('professeur_id', professorId)
-          .gte('date', startOfWeek.toIso8601String())
-          .lt('date', endOfWeek.toIso8601String())
-          .order('date', ascending: true);
+          .select('id, qr_code, est_active, horaire:horaire_id(id, date, duree_minutes, cours: cours_id (nom), salle: salle_id (nom), professeur_id)')
+          .gte('horaire.date', startOfWeek.toIso8601String())
+          .lt('horaire.date', endOfWeek.toIso8601String())
+          .eq('horaire.professeur_id', professorId);
       return List<Map<String, dynamic>>.from(data);
     } catch (e) {
       throw Exception('Erreur lors de la récupération des séances planifiées: $e');
@@ -610,6 +609,21 @@ class DataService {
     } catch (e) {
       print('[ERREUR] lors de la création de la session activée: ' + e.toString());
       throw Exception('Erreur lors de la création de la session activée: ' + e.toString());
+    }
+  }
+
+  /// Récupère les horaires planifiés d'un professeur pour une semaine donnée
+  static Future<List<Map<String, dynamic>>> getProfessorHorairesForWeek(String professorId, DateTime startOfWeek, DateTime endOfWeek) async {
+    try {
+      final data = await _supabase
+          .from('horaires')
+          .select('id, date, duree_minutes, cours: cours_id (nom), salle: salle_id (nom)')
+          .eq('professeur_id', professorId)
+          .gte('date', startOfWeek.toIso8601String())
+          .lt('date', endOfWeek.toIso8601String());
+      return List<Map<String, dynamic>>.from(data);
+    } catch (e) {
+      throw Exception('Erreur lors de la récupération des horaires: $e');
     }
   }
 
