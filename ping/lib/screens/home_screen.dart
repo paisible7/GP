@@ -197,7 +197,11 @@ class _HomePageState extends State<_HomePage> {
 
   void _selectSession(String sessionId) {
     setState(() {
-      _selectedSessionId = sessionId;
+      if (_selectedSessionId == sessionId) {
+        _selectedSessionId = null; // Désélection
+      } else {
+        _selectedSessionId = sessionId;
+      }
     });
   }
 
@@ -401,43 +405,84 @@ class _HomePageState extends State<_HomePage> {
                             final session = _sessionsByHoraireId[horaire['id']];
                             final isActive = session != null && session['est_active'] == true;
                             final isSelected = _selectedSessionId == horaire['id'];
-                            return GestureDetector(
-                              onTap: () => _selectSession(horaire['id']),
-                              child: Card(
-                                margin: const EdgeInsets.only(bottom: 8),
-                                color: isSelected ? AppColor.primary.withOpacity(0.15) : (isActive ? Colors.green.shade50 : null),
-                                child: ListTile(
-                                  leading: Icon(
-                                    isActive ? Icons.play_circle : Icons.schedule,
-                                    color: isActive ? Colors.green : Colors.orange,
-                                  ),
-                                  title: Text(
-                                    cours?['nom'] ?? 'Cours inconnu',
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
-                                  ),
-                                  subtitle: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text('Heure: ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}'),
-                                      if (horaire['salle'] != null)
-                                        Text('Salle: ${horaire['salle']['nom']}'),
-                                      Text(
-                                        isActive ? 'Session active' : 'Session planifiée',
-                                        style: TextStyle(
-                                          color: isActive ? Colors.green : Colors.orange,
-                                          fontWeight: FontWeight.bold,
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: isSelected
+                                    ? BorderSide(color: AppColor.primary, width: 2)
+                                    : BorderSide(color: Colors.transparent, width: 0),
+                              ),
+                              color: isSelected
+                                  ? AppColor.primary.withOpacity(0.18)
+                                  : (isActive ? Colors.green.shade50 : null),
+                              child: ListTile(
+                                onTap: () => _selectSession(horaire['id']),
+                                leading: Icon(
+                                  isActive ? Icons.play_circle : Icons.schedule,
+                                  color: isActive ? Colors.green : Colors.orange,
+                                ),
+                                title: Text(
+                                  cours?['nom'] ?? 'Cours inconnu',
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Heure: ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}'),
+                                    if (horaire['salle'] != null)
+                                      Text('Salle: ${horaire['salle']['nom']}'),
+                                    Text(
+                                      isActive ? 'Session active' : 'Session planifiée',
+                                      style: TextStyle(
+                                        color: isActive ? Colors.green : Colors.orange,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (isSelected)
+                                      const Icon(Icons.check_circle, color: AppColor.primary),
+                                    if (!isActive)
+                                      Padding(
+                                        padding: const EdgeInsets.only(left: 8.0),
+                                        child: Tooltip(
+                                          message: 'Générer le QR code pour ce cours',
+                                          child: ElevatedButton.icon(
+                                            icon: const Icon(Icons.qr_code),
+                                            label: const Text('Générer'),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: AppColor.primary,
+                                              foregroundColor: Colors.white,
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                              textStyle: const TextStyle(fontSize: 14),
+                                            ),
+                                            onPressed: () {
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (context) => GenerateQRScreen(horaireId: horaire['id']),
+                                                ),
+                                              );
+                                            },
+                                          ),
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                  trailing: isSelected
-                                      ? const Icon(Icons.check_circle, color: AppColor.primary)
-                                      : null,
+                                  ],
                                 ),
                               ),
                             );
                           },
                         ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Sélectionnez un cours du jour pour activer le bouton flottant ou utilisez le bouton "Générer" sur la carte.',
+                        style: TextStyle(fontSize: 14, color: Colors.grey),
+                        textAlign: TextAlign.center,
+                      ),
                     ],
                   ),
                 ),
@@ -540,23 +585,30 @@ class _HomePageState extends State<_HomePage> {
         ),
       ),
       floatingActionButton: userProvider.userRole == 'professeur'
-          ? FloatingActionButton.extended(
-              onPressed: (_isGeneratingQR || _selectedSessionId == null) ? null : _generateQRCode,
-              icon: _isGeneratingQR 
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                  )
-                : const Icon(Icons.qr_code, color: Colors.white),
-              label: Text(
-                _isGeneratingQR ? 'Génération...' : 'Générer QR Code',
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold)
+          ? Tooltip(
+              message: _selectedSessionId != null
+                  ? 'Générer le QR code pour le cours sélectionné'
+                  : 'Sélectionnez un cours du jour pour activer ce bouton',
+              child: FloatingActionButton.extended(
+                onPressed: _selectedSessionId != null
+                    ? () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => GenerateQRScreen(horaireId: _selectedSessionId!)),
+                        );
+                      }
+                    : null,
+                icon: const Icon(Icons.qr_code, color: Colors.white),
+                label: const Text(
+                  'Générer QR Code',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold),
+                ),
+                backgroundColor: AppColor.primary,
               ),
-              backgroundColor: AppColor.primary,
             )
           : FloatingActionButton.extended(
               onPressed: () {

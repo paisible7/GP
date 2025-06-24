@@ -1,104 +1,90 @@
 import 'package:flutter/material.dart';
+import 'package:ping/theme/app_theme.dart';
+import 'package:qr/qr.dart';
+import 'dart:async';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:ping/providers/user_provider.dart';
-import 'package:ping/theme/app_theme.dart';
-import 'package:ping/core/data_service.dart';
-import 'package:qr/qr.dart';
-import 'package:uuid/uuid.dart';
-import 'package:intl/intl.dart';
 
 class GenerateQRScreen extends StatefulWidget {
-  const GenerateQRScreen({Key? key}) : super(key: key);
+  final String horaireId;
+  const GenerateQRScreen({Key? key, required this.horaireId}) : super(key: key);
 
   @override
   State<GenerateQRScreen> createState() => _GenerateQRScreenState();
 }
 
 class _GenerateQRScreenState extends State<GenerateQRScreen> {
-  List<Map<String, dynamic>> _coursList = [];
-  bool _isLoading = false;
-  String? _selectedCoursId;
   String? _generatedQRCode;
+  int _countdown = 5;
+  Timer? _qrTimer;
+  Timer? _countdownTimer;
   bool _isGenerating = false;
 
   @override
   void initState() {
     super.initState();
-    _loadCours();
+    _startQrTimer();
   }
 
-  Future<void> _loadCours() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final userId = Provider.of<UserProvider>(context, listen: false).userId;
-      if (userId == null) {
-        throw Exception('Utilisateur non connecté.');
-      }
-
-      final data = await DataService.getProfessorCourses(userId);
-      
-      if (mounted) {
-        setState(() {
-          _coursList = data;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur lors du chargement des cours: $e')),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
+  @override
+  void dispose() {
+    _qrTimer?.cancel();
+    _countdownTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _generateQRCode() async {
-    if (_selectedCoursId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez sélectionner un cours')),
-      );
-      return;
-    }
-
     setState(() {
       _isGenerating = true;
     });
-
     try {
-      final qrCode = const Uuid().v4();
       final userId = Provider.of<UserProvider>(context, listen: false).userId;
-      
-      if (userId == null) {
-        throw Exception('Utilisateur non connecté.');
-      }
-      
-      // Créer une nouvelle session avec le QR code
-      await DataService.createSessionWithQR(
-        coursId: _selectedCoursId!,
-        qrCode: qrCode,
-        professorId: userId,
-      );
-
-      if (mounted) {
-        setState(() {
-          _generatedQRCode = qrCode;
-        });
-        
-        _showQRCodeDialog(qrCode);
+      print('[QR] Appel RPC generate_temp_qr avec horaire = \\${widget.horaireId}, prof = \\${userId}');
+      final response = await Supabase.instance.client.rpc('generate_temp_qr', params: {
+        'horaire': widget.horaireId,
+        'prof': userId,
+      });
+      print('[QR] Réponse Supabase brute : \\${response.toString()}');
+      if (response is String) {
+        // Succès, on a le QR code
+        if (mounted) {
+          setState(() {
+            _generatedQRCode = response;
+          });
+        }
+      } else if (response is PostgrestException) {
+        // Erreur Supabase
+        print('[QR] Erreur Supabase: \\${response.message}');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erreur Supabase: \\${response.message}')),
+          );
+          setState(() {
+            _generatedQRCode = null;
+          });
+        }
+      } else {
+        // Cas inattendu
+        print('[QR] Réponse inattendue: \\${response}');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erreur inattendue lors de la génération du QR code.')),
+          );
+          setState(() {
+            _generatedQRCode = null;
+          });
+        }
       }
     } catch (e) {
+      print('[QR] Exception lors de la génération du QR code: \\${e}');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur lors de la génération du QR code: $e')),
+          SnackBar(content: Text('Erreur lors de la génération du QR code: \\${e}')),
         );
+        setState(() {
+          _generatedQRCode = null;
+        });
       }
     } finally {
       if (mounted) {
@@ -109,157 +95,70 @@ class _GenerateQRScreenState extends State<GenerateQRScreen> {
     }
   }
 
-  void _showQRCodeDialog(String qrCode) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('QR Code généré avec succès'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Vos étudiants peuvent maintenant scanner ce QR code pour enregistrer leur présence.'),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: 250,
-              height: 250,
-              child: Center(
-                child: QrImageWidget(data: qrCode, size: 200),
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'Code: $qrCode',
-              style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Fermer'),
-          ),
-        ],
-      ),
-    );
+  void _startQrTimer() {
+    _qrTimer?.cancel();
+    _countdownTimer?.cancel();
+    _generateQRCode();
+    _countdown = 5;
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      setState(() {
+        _countdown--;
+      });
+      if (_countdown <= 0) {
+        setState(() {
+          _countdown = 5;
+        });
+      }
+    });
+    _qrTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      _generateQRCode();
+      setState(() {
+        _countdown = 5;
+      });
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('Générer QR Code'),
+        title: const Text('QR Code Présence'),
         backgroundColor: AppColor.primary,
         foregroundColor: Colors.white,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Sélectionner un cours',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    if (_isLoading)
-                      const Center(child: CircularProgressIndicator())
-                    else if (_coursList.isEmpty)
-                      const Center(
-                        child: Text(
-                          'Aucun cours assigné',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      )
-                    else
-                      DropdownButtonFormField<String>(
-                        value: _selectedCoursId,
-                        decoration: const InputDecoration(
-                          labelText: 'Cours',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.school),
-                        ),
-                        items: _coursList.map((cours) {
-                          return DropdownMenuItem<String>(
-                            value: cours['id'],
-                            child: Text(cours['nom']),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedCoursId = value;
-                            _generatedQRCode = null;
-                          });
-                        },
-                      ),
+      body: Center(
+        child: _isGenerating && _generatedQRCode == null
+            ? const CircularProgressIndicator()
+            : Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (_generatedQRCode != null && _generatedQRCode!.isNotEmpty)
+                    SizedBox(
+                      width: 300,
+                      height: 300,
+                      child: QrImageWidget(data: _generatedQRCode!, size: 300),
+                    )
+                  else ...[
+                    const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                    const SizedBox(height: 10),
+                    const Text('Aucun QR code généré.', style: TextStyle(color: Colors.red, fontSize: 18)),
                   ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: _selectedCoursId != null && !_isGenerating ? _generateQRCode : null,
-              icon: _isGenerating 
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.qr_code),
-              label: Text(_isGenerating ? 'Génération...' : 'Générer QR Code'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColor.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-            ),
-            if (_generatedQRCode != null) ...[
-              const SizedBox(height: 20),
-              Card(
-                color: Colors.green.shade50,
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    children: [
-                      const Icon(
-                        Icons.check_circle,
-                        color: Colors.green,
-                        size: 48,
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'QR Code généré avec succès !',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Code: $_generatedQRCode',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontFamily: 'monospace',
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
+                  const SizedBox(height: 30),
+                  Text(
+                    'Nouveau code dans $_countdown s',
+                    style: const TextStyle(fontSize: 20, color: Colors.grey),
                   ),
-                ),
+                ],
               ),
-            ],
-          ],
-        ),
       ),
     );
   }
@@ -269,16 +168,11 @@ class QrImageWidget extends StatelessWidget {
   final String data;
   final double size;
 
-  const QrImageWidget({
-    Key? key,
-    required this.data,
-    required this.size,
-  }) : super(key: key);
+  const QrImageWidget({Key? key, required this.data, required this.size}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     final qrCode = QrCode(4, QrErrorCorrectLevel.L)..addData(data);
-
     return CustomPaint(
       size: Size(size, size),
       painter: QrPainter(
@@ -293,24 +187,18 @@ class QrPainter extends CustomPainter {
   final QrImage qrImage;
   final Color color;
 
-  QrPainter({
-    required this.qrImage,
-    required this.color,
-  });
+  QrPainter({required this.qrImage, required this.color});
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..color = color
       ..style = PaintingStyle.fill;
-
     canvas.drawRect(
       Rect.fromLTWH(0, 0, size.width, size.height),
       Paint()..color = Colors.white,
     );
-
     final moduleSize = size.width / qrImage.moduleCount;
-
     for (var x = 0; x < qrImage.moduleCount; x++) {
       for (var y = 0; y < qrImage.moduleCount; y++) {
         if (qrImage.isDark(y, x)) {
