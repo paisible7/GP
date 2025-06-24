@@ -93,10 +93,11 @@ class _HomePage extends StatefulWidget {
 
 class _HomePageState extends State<_HomePage> {
   List<Map<String, dynamic>> _coursList = [];
-  List<Map<String, dynamic>> _coursDuJour = [];
+  List<Map<String, dynamic>> _horairesDuJour = [];
+  Map<String, Map<String, dynamic>> _sessionsByHoraireId = {};
   bool _isCoursesLoading = false;
   bool _coursesHaveBeenFetched = false;
-  String? _selectedCoursId;
+  String? _selectedSessionId;
   bool _isGeneratingQR = false;
 
   @override
@@ -139,49 +140,71 @@ class _HomePageState extends State<_HomePage> {
     }
   }
 
-  Future<void> _fetchCoursDuJour() async {
+  Future<void> _fetchHorairesDuJour() async {
     if (!mounted) return;
     try {
       final userId = Provider.of<UserProvider>(context, listen: false).userId;
       if (userId == null) {
+        print('[fetchHorairesDuJour] Utilisateur non connecté.');
         throw Exception('Utilisateur non connecté.');
       }
-
       final today = DateTime.now();
       final startOfDay = DateTime(today.year, today.month, today.day);
       final endOfDay = startOfDay.add(const Duration(days: 1));
-
-      final data = await Supabase.instance.client
+      print('[fetchHorairesDuJour] userId=$userId, startOfDay=$startOfDay, endOfDay=$endOfDay');
+      // Récupérer les horaires du jour
+      final horaires = await Supabase.instance.client
+        .from('horaires')
+        .select('id, date, duree_minutes, cours: cours_id(nom), salle: salle_id(nom), professeur_id')
+        .eq('professeur_id', userId)
+        .gte('date', startOfDay.toIso8601String())
+        .lt('date', endOfDay.toIso8601String());
+      print('[fetchHorairesDuJour] horaires=$horaires');
+      // Récupérer les sessions_presence pour ces horaires
+      final horaireIds = (horaires as List).map((h) => h['id'] as String).toList();
+      Map<String, Map<String, dynamic>> sessionsMap = {};
+      if (horaireIds.isNotEmpty) {
+        final sessions = await Supabase.instance.client
           .from('sessions_presence')
-          .select('*, cours(nom, salles_de_cours(nom))')
-          .eq('professeur_id', userId)
-          .gte('date', startOfDay.toIso8601String())
-          .lt('date', endOfDay.toIso8601String())
-          .order('date', ascending: true);
-
+          .select('id, qr_code, est_active, horaire_id')
+          .inFilter('horaire_id', horaireIds);
+        print('[fetchHorairesDuJour] sessions_presence=$sessions');
+        for (var s in sessions) {
+          sessionsMap[s['horaire_id']] = s;
+        }
+      }
       if (mounted) {
         setState(() {
-          _coursDuJour = List<Map<String, dynamic>>.from(data as List);
+          _horairesDuJour = List<Map<String, dynamic>>.from(horaires as List);
+          _horairesDuJour.sort((a, b) {
+            final dateA = DateTime.tryParse(a['date'] ?? '') ?? DateTime(1970);
+            final dateB = DateTime.tryParse(b['date'] ?? '') ?? DateTime(1970);
+            return dateA.compareTo(dateB);
+          });
+          _sessionsByHoraireId = sessionsMap;
         });
+        print('[fetchHorairesDuJour] _horairesDuJour=${_horairesDuJour.length} éléments');
       }
-    } catch (e) {
+    } catch (e, stack) {
+      print('[fetchHorairesDuJour] ERREUR: $e');
+      print(stack);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Erreur lors du chargement des cours du jour: $e')));
+            content: Text('Erreur lors du chargement des horaires du jour: $e')));
       }
     }
   }
 
-  void _selectCours(String coursId) {
+  void _selectSession(String sessionId) {
     setState(() {
-      _selectedCoursId = coursId;
+      _selectedSessionId = sessionId;
     });
   }
 
   Future<void> _generateQRCode() async {
-    if (_selectedCoursId == null) {
+    if (_selectedSessionId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez d\'abord sélectionner un cours')),
+        const SnackBar(content: Text('Veuillez d\'abord sélectionner un cours du jour')),
       );
       return;
     }
@@ -193,22 +216,23 @@ class _HomePageState extends State<_HomePage> {
     try {
       final qrCode = const Uuid().v4();
       final userId = Provider.of<UserProvider>(context, listen: false).userId;
-      
       if (userId == null) {
         throw Exception('Utilisateur non connecté.');
       }
-      
-      // Créer une nouvelle session avec le QR code
-      await DataService.createSessionWithQR(
-        coursId: _selectedCoursId!,
-        qrCode: qrCode,
-        professorId: userId,
-      );
+      // On retrouve l'horaire sélectionné
+      final horaire = _horairesDuJour.firstWhere((h) => h['id'] == _selectedSessionId);
+      // Créer une nouvelle session_presence avec le QR code
+      await Supabase.instance.client
+        .from('sessions_presence')
+        .insert({
+          'horaire_id': horaire['id'],
+          'qr_code': qrCode,
+          'est_active': true,
+        });
 
       if (mounted) {
         _showQRCodeDialog(qrCode);
-        // Recharger les cours du jour pour afficher la nouvelle session
-        _fetchCoursDuJour();
+        _fetchHorairesDuJour();
       }
     } catch (e) {
       if (mounted) {
@@ -269,7 +293,7 @@ class _HomePageState extends State<_HomePage> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           _fetchCours();
-          _fetchCoursDuJour();
+          _fetchHorairesDuJour();
         }
       });
     }
@@ -333,7 +357,7 @@ class _HomePageState extends State<_HomePage> {
             ),
             const SizedBox(height: 20),
             if (userProvider.userRole == 'professeur') ...[
-              // Section des cours du jour
+              // Section des cours du jour (à partir des horaires)
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
@@ -354,7 +378,7 @@ class _HomePageState extends State<_HomePage> {
                         ],
                       ),
                       const SizedBox(height: 16),
-                      if (_coursDuJour.isEmpty)
+                      if (_horairesDuJour.isEmpty)
                         const Center(
                           child: Padding(
                             padding: EdgeInsets.all(16.0),
@@ -369,39 +393,46 @@ class _HomePageState extends State<_HomePage> {
                         ListView.builder(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _coursDuJour.length,
+                          itemCount: _horairesDuJour.length,
                           itemBuilder: (context, index) {
-                            final session = _coursDuJour[index];
-                            final cours = session['cours'] as Map<String, dynamic>?;
-                            final date = DateTime.parse(session['date'] as String);
-                            final isActive = session['est_active'] == true;
-                            
-                            return Card(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              color: isActive ? Colors.green.shade50 : null,
-                              child: ListTile(
-                                leading: Icon(
-                                  isActive ? Icons.play_circle : Icons.schedule,
-                                  color: isActive ? Colors.green : Colors.orange,
-                                ),
-                                title: Text(
-                                  cours?['nom'] ?? 'Cours inconnu',
-                                  style: const TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('Heure: ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}'),
-                                    if (cours?['salles_de_cours'] != null)
-                                      Text('Salle: ${cours!['salles_de_cours']['nom']}'),
-                                    Text(
-                                      isActive ? 'Session active' : 'Session planifiée',
-                                      style: TextStyle(
-                                        color: isActive ? Colors.green : Colors.orange,
-                                        fontWeight: FontWeight.bold,
+                            final horaire = _horairesDuJour[index];
+                            final cours = horaire['cours'] as Map<String, dynamic>?;
+                            final date = DateTime.parse(horaire['date'] ?? '');
+                            final session = _sessionsByHoraireId[horaire['id']];
+                            final isActive = session != null && session['est_active'] == true;
+                            final isSelected = _selectedSessionId == horaire['id'];
+                            return GestureDetector(
+                              onTap: () => _selectSession(horaire['id']),
+                              child: Card(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                color: isSelected ? AppColor.primary.withOpacity(0.15) : (isActive ? Colors.green.shade50 : null),
+                                child: ListTile(
+                                  leading: Icon(
+                                    isActive ? Icons.play_circle : Icons.schedule,
+                                    color: isActive ? Colors.green : Colors.orange,
+                                  ),
+                                  title: Text(
+                                    cours?['nom'] ?? 'Cours inconnu',
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                  subtitle: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('Heure: ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}'),
+                                      if (horaire['salle'] != null)
+                                        Text('Salle: ${horaire['salle']['nom']}'),
+                                      Text(
+                                        isActive ? 'Session active' : 'Session planifiée',
+                                        style: TextStyle(
+                                          color: isActive ? Colors.green : Colors.orange,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
+                                  trailing: isSelected
+                                      ? const Icon(Icons.check_circle, color: AppColor.primary)
+                                      : null,
                                 ),
                               ),
                             );
@@ -412,7 +443,17 @@ class _HomePageState extends State<_HomePage> {
                 ),
               ),
               const SizedBox(height: 20),
-              // Section de tous les cours assignés
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const SessionHistoryScreen()),
+                  );
+                },
+                child: const Text('Voir l\'historique de mes sessions'),
+              ),
+              // Section de tous les cours assignés (affichage simple, sans sélection)
               if (_isCoursesLoading)
                 const Center(child: CircularProgressIndicator())
               else if (_coursList.isEmpty)
@@ -447,32 +488,6 @@ class _HomePageState extends State<_HomePage> {
                           ],
                         ),
                         const SizedBox(height: 16),
-                        if (_selectedCoursId != null) ...[
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: AppColor.primary.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppColor.primary),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.check_circle, color: AppColor.primary),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'Cours sélectionné: ${_coursList.firstWhere((c) => c['id'] == _selectedCoursId)['nom']}',
-                                    style: TextStyle(
-                                      color: AppColor.primary,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                        ],
                         GridView.builder(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
@@ -486,44 +501,19 @@ class _HomePageState extends State<_HomePage> {
                           itemCount: _coursList.length,
                           itemBuilder: (context, index) {
                             final cours = _coursList[index];
-                            final isSelected = _selectedCoursId == cours['id'];
-                            return GestureDetector(
-                              onTap: () => _selectCours(cours['id']),
-                              child: Card(
-                                elevation: isSelected ? 4 : 2,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  side: isSelected 
-                                    ? BorderSide(color: AppColor.primary, width: 2)
-                                    : BorderSide.none,
-                                ),
-                                color: isSelected ? AppColor.primary.withOpacity(0.1) : null,
-                                child: Stack(
-                                  children: [
-                                    Center(
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(8.0),
-                                        child: Text(
-                                          cours['nom'] as String,
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: isSelected ? AppColor.primary : null,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    if (isSelected)
-                                      Positioned(
-                                        top: 8,
-                                        right: 8,
-                                        child: Icon(
-                                          Icons.check_circle,
-                                          color: AppColor.primary,
-                                          size: 20,
-                                        ),
-                                      ),
-                                  ],
+                            return Card(
+                              elevation: 2,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(8.0),
+                                  child: Text(
+                                    cours['nom'] as String,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  ),
                                 ),
                               ),
                             );
@@ -533,17 +523,6 @@ class _HomePageState extends State<_HomePage> {
                     ),
                   ),
                 ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const SessionHistoryScreen()),
-                  );
-                },
-                child: const Text('Voir l\'historique de mes sessions'),
-              ),
             ] else if (userProvider.userRole == 'etudiant') ...[
               ElevatedButton(
                 onPressed: () {
@@ -562,7 +541,7 @@ class _HomePageState extends State<_HomePage> {
       ),
       floatingActionButton: userProvider.userRole == 'professeur'
           ? FloatingActionButton.extended(
-              onPressed: _isGeneratingQR ? null : _generateQRCode,
+              onPressed: (_isGeneratingQR || _selectedSessionId == null) ? null : _generateQRCode,
               icon: _isGeneratingQR 
                 ? const SizedBox(
                     width: 20,
